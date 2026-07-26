@@ -1,0 +1,45 @@
+# --- Dépendances téléchargées automatiquement ---------------------------------
+# Jars Mojang (redistribution interdite par l'EULA) et JRE portable.
+.cache/
+.runtime/
+
+# --- Données locales ----------------------------------------------------------
+# Mondes, logs, config de la machine : rien à faire dans le dépôt.
+servers/
+.trash/
+.logs/
+panel.json
+server.conf
+.server.pid
+.launch.cmd
+
+# --- Serveur lancé à la racine (usage server.bat sans le panel) ---------------
+world/
+world_*/
+logs/
+crash-reports/
+libraries/
+versions/
+eula.txt
+server.properties
+whitelist.json
+ops.json
+banned-players.json
+banned-ips.json
+usercache.json
+usernamecache.json
+*.jar
+
+# --- Python -------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# --- Système et éditeurs ------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
