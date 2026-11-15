@@ -5,6 +5,7 @@ donc l'UI reste réactive pendant qu'un reset ou un téléchargement tourne.
 """
 from __future__ import annotations
 
+import ipaddress
 import json
 import mimetypes
 import socket
@@ -30,14 +31,33 @@ def public_ip() -> str | None:
             return _public_ip_cache["ip"]
     for url in ("https://api.ipify.org", "https://ifconfig.me/ip", "https://icanhazip.com"):
         try:
-            ip = deps.http_get(url, timeout=4).decode("utf-8").strip()
-            if ip and len(ip) < 40:
-                with _pub_lock:
-                    _public_ip_cache.update({"ip": ip, "at": time.time()})
-                return ip
-        except Exception:
+            ip = str(ipaddress.ip_address(deps.http_get(url, timeout=4).decode("utf-8").strip()))
+        except Exception:  # injoignable, ou réponse qui n'est pas une IP (page d'erreur...)
             continue
+        with _pub_lock:
+            _public_ip_cache.update({"ip": ip, "at": time.time()})
+        return ip
     return None
+
+
+_HOSTNAME = socket.gethostname().lower()
+
+
+def host_allowed(host_header: str | None) -> bool:
+    """Parade au DNS rebinding : un site dont le domaine pointe soudain vers 127.0.0.1
+    parlerait au panel comme une page locale. Seuls localhost, une IP ou le nom de cette
+    machine sont acceptés."""
+    host = (host_header or "").strip().lower()
+    if not host:
+        return True  # client sans en-tête Host : pas un navigateur
+    name = host[1:].split("]", 1)[0] if host.startswith("[") else host.rsplit(":", 1)[0]
+    if name == "localhost" or name.endswith(".localhost") or name in (_HOSTNAME, _HOSTNAME + ".local"):
+        return True
+    try:
+        ipaddress.ip_address(name)
+        return True
+    except ValueError:
+        return False
 
 
 def system_info() -> dict:
@@ -80,10 +100,35 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
     def json(self, data, code: int = 200) -> None:
-        self._send(code, json.dumps(data, default=str).encode("utf-8"), extra={"Access-Control-Allow-Origin": "*"})
+        # Pas d'Access-Control-Allow-Origin : l'interface est servie par le panel lui-même,
+        # et aucun autre site ne doit pouvoir lire l'état, les IP ou la console.
+        self._send(code, json.dumps(data, default=str).encode("utf-8"))
 
     def fail(self, message: str, code: int = 400) -> None:
         self.json({"ok": False, "error": message}, code)
+
+    def _same_origin(self) -> bool:
+        """Parade au CSRF : une page web quelconque ne doit pas pouvoir piloter le panel.
+        Les navigateurs envoient Origin sur POST/DELETE ; curl et les scripts, non."""
+        origin = self.headers.get("Origin")
+        if origin is None:
+            return True
+        parsed = urllib.parse.urlsplit(origin)
+        return parsed.scheme in ("http", "https") and \
+            parsed.netloc.lower() == (self.headers.get("Host") or "").strip().lower()
+
+    def _guard(self, write: bool) -> bool:
+        if not host_allowed(self.headers.get("Host")):
+            reason = "Hôte non autorisé"
+        elif write and not self._same_origin():
+            reason = "Requête venant d'un autre site refusée"
+        else:
+            return True
+        # Corps de requête non lu : la connexion est fermée plutôt que réutilisée, sinon ce
+        # corps serait lu comme une nouvelle requête.
+        self._send(403, json.dumps({"ok": False, "error": reason}).encode("utf-8"),
+                   extra={"Connection": "close"})
+        return False
 
     def body_json(self) -> dict:
         try:
@@ -101,13 +146,13 @@ class Handler(BaseHTTPRequestHandler):
 
     # ------------------------------------------------------------------ verbs
     def do_OPTIONS(self) -> None:
-        self._send(204, b"", extra={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
-        })
+        # Aucune autorisation CORS : le navigateur bloque les requêtes venant d'autres sites.
+        if self._guard(write=False):
+            self._send(204, b"", extra={"Allow": "GET,POST,PATCH,DELETE,OPTIONS"})
 
     def do_GET(self) -> None:
+        if not self._guard(write=False):
+            return
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
@@ -121,6 +166,8 @@ class Handler(BaseHTTPRequestHandler):
             self.fail(str(exc), 500)
 
     def do_POST(self) -> None:
+        if not self._guard(write=True):
+            return
         parsed = urllib.parse.urlparse(self.path)
         try:
             self._api_post(parsed.path, self.body_json())
@@ -132,6 +179,8 @@ class Handler(BaseHTTPRequestHandler):
     do_PATCH = do_POST
 
     def do_DELETE(self) -> None:
+        if not self._guard(write=True):
+            return
         parsed = urllib.parse.urlparse(self.path)
         parts = [p for p in parsed.path.split("/") if p]
         try:
@@ -277,27 +326,36 @@ class Handler(BaseHTTPRequestHandler):
             action = parts[2] if len(parts) > 2 else "update"
 
             if action == "update":
-                return self.json({"ok": True, "server": mgr.update(srv.id, body).snapshot()})
+                updated, result = mgr.update(srv.id, body)
+                return self.json({
+                    "ok": True,
+                    "server": updated.snapshot(),
+                    "restart_needed": result.get("restart_needed", []),
+                    "rejected": result.get("rejected", []),
+                })
 
+            # dedupe : un double clic ou une touche maintenue ne lance pas deux resets
+            # d'affilée (le second effaçait le monde tout neuf).
             if action == "start":
-                job = RUNNER.submit("start", lambda rep: srv.start(rep), target=srv.id)
+                job = RUNNER.submit("start", lambda rep: srv.start(rep), target=srv.id, dedupe=True)
                 return self.json({"ok": True, "job": job.as_dict()}, 202)
 
             if action == "stop":
                 graceful = body.get("graceful", True)
-                job = RUNNER.submit("stop", lambda rep: srv.stop(rep, graceful=graceful), target=srv.id)
+                job = RUNNER.submit("stop", lambda rep: srv.stop(rep, graceful=graceful), target=srv.id,
+                                    dedupe=True)
                 return self.json({"ok": True, "job": job.as_dict()}, 202)
 
             if action == "restart":
-                job = RUNNER.submit("restart", lambda rep: srv.restart(rep), target=srv.id)
+                job = RUNNER.submit("restart", lambda rep: srv.restart(rep), target=srv.id, dedupe=True)
                 return self.json({"ok": True, "job": job.as_dict()}, 202)
 
             if action == "reset":
-                job = RUNNER.submit("reset", lambda rep: srv.reset(rep), target=srv.id)
+                job = RUNNER.submit("reset", lambda rep: srv.reset(rep), target=srv.id, dedupe=True)
                 return self.json({"ok": True, "job": job.as_dict()}, 202)
 
             if action == "clean":
-                job = RUNNER.submit("clean", lambda rep: srv.clean(rep), target=srv.id)
+                job = RUNNER.submit("clean", lambda rep: srv.clean(rep), target=srv.id, dedupe=True)
                 return self.json({"ok": True, "job": job.as_dict()}, 202)
 
             if action == "command":
@@ -369,9 +427,9 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/", "/index.html"):
             target = cfg.WEB_DIR / "index.html"
         else:
-            safe = Path(urllib.parse.unquote(path.lstrip("/"))).as_posix()
-            target = (cfg.WEB_DIR / safe).resolve()
-            if not str(target).startswith(str(cfg.WEB_DIR.resolve())):
+            web_root = cfg.WEB_DIR.resolve()
+            target = (web_root / urllib.parse.unquote(path.lstrip("/"))).resolve()
+            if not target.is_relative_to(web_root):  # startswith laissait passer « web-xxx/ »
                 return self.fail("Chemin interdit", 403)
         if not target.exists() or target.is_dir():
             return self.fail("Fichier introuvable: %s" % path, 404)
@@ -383,8 +441,12 @@ class Handler(BaseHTTPRequestHandler):
 
 class PanelServer(ThreadingHTTPServer):
     daemon_threads = True
-    allow_reuse_address = True
+    allow_reuse_address = False  # remplacé par tune_listen_socket (SO_REUSEADDR piège sous Windows)
     request_queue_size = 64
+
+    def server_bind(self) -> None:
+        cfg.tune_listen_socket(self.socket)
+        super().server_bind()
 
 
 _server_ref: dict = {"server": None}
@@ -411,7 +473,7 @@ def serve(port: int, host: str = "127.0.0.1") -> PanelServer:
 def find_panel_port(preferred: int) -> int:
     for candidate in [preferred] + [preferred + i for i in range(1, 30)]:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            cfg.tune_listen_socket(sock)
             try:
                 sock.bind(("0.0.0.0", candidate))
                 return candidate

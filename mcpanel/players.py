@@ -13,6 +13,7 @@ import re
 import threading
 import urllib.error
 import uuid as uuidlib
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from . import deps
@@ -125,3 +126,30 @@ def remove_entry(path: Path, name: str) -> bool:
         return False
     write_list(path, kept)
     return True
+
+
+def rekey(path: Path, online_mode: bool) -> list[str]:
+    """Recalcule les UUID d'une liste (whitelist, OP) pour le mode d'authentification donné.
+
+    Un même pseudo n'a pas le même UUID en online-mode (compte Mojang) et en offline-mode
+    (calculé depuis le pseudo). Minecraft compare les UUID : sans cette conversion,
+    accepter ou refuser les comptes crack ferait perdre la whitelist et les OP.
+    Retourne les pseudos sans compte Mojang trouvé (laissés tels quels).
+    """
+    entries = read_list(path)
+    if not entries:
+        return []
+    names = [entry["name"] for entry in entries]
+    if online_mode:
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            found = list(pool.map(lookup_mojang, names))
+    else:
+        found = [(offline_uuid(name), name) for name in names]
+    unresolved = []
+    for entry, hit in zip(entries, found):
+        if hit:
+            entry["uuid"], entry["name"] = hit
+        else:
+            unresolved.append(entry["name"])
+    write_list(path, entries)
+    return unresolved

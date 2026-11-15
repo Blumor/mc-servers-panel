@@ -18,6 +18,7 @@ import time
 import urllib.error
 import urllib.request
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from . import config as cfg
@@ -166,11 +167,14 @@ def scan_java(max_age: float = 30.0) -> list[dict]:
     with _java_lock:
         if _scan_cache["at"] and time.time() - _scan_cache["at"] < max_age:
             return list(_scan_cache["result"])
-    result = []
-    for binary in _candidate_java_bins():
-        ver = java_version_of(binary)
-        if ver:
-            result.append({"path": binary, "major": ver, "managed": str(cfg.RUNTIME_DIR) in binary})
+    binaries = _candidate_java_bins()
+    # Un `java -version` prend 50-300 ms : en parallèle, la page s'ouvre sans attendre la somme.
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        versions = list(pool.map(java_version_of, binaries))
+    result = [
+        {"path": binary, "major": ver, "managed": str(cfg.RUNTIME_DIR) in binary}
+        for binary, ver in zip(binaries, versions) if ver
+    ]
     with _java_lock:
         _scan_cache["result"] = result
         _scan_cache["at"] = time.time()
@@ -285,7 +289,8 @@ def _safe_extract_tar(tf: tarfile.TarFile, dest: Path) -> None:
     dest = dest.resolve()
     for member in tf.getmembers():
         target = (dest / member.name).resolve()
-        if not str(target).startswith(str(dest)):
+        # is_relative_to et non startswith : « /x/jre-evil » commence aussi par « /x/jre ».
+        if not target.is_relative_to(dest):
             raise RuntimeError("Archive suspecte (path traversal): %s" % member.name)
     try:
         tf.extractall(dest, filter="data")

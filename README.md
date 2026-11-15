@@ -84,6 +84,12 @@ Sinon, lancer le panel directement sous Windows avec `PANEL.bat`.
 Opérateur en CGNAT (pas d'IP publique dédiée) : passer par un tunnel type Playit.gg, ou un VPN
 type ZeroTier / Radmin VPN / Tailscale.
 
+**Ton pote n'a pas de compte Minecraft officiel ?** Active *Accepter les comptes crack* (à la
+création, ou ⚙️ → Joueurs ; désactivé par défaut). Contrepartie : plus aucun pseudo n'est
+vérifié. Quelqu'un qui a l'adresse peut entrer sous ton pseudo ou celui d'un OP, et la whitelist
+ne l'arrête pas (elle se base sur le pseudo). Ne donne l'adresse qu'à des gens de confiance.
+Les UUID de la whitelist et des OP sont convertis tout seuls au démarrage suivant.
+
 ---
 
 ## Réglages (bouton ⚙️)
@@ -92,15 +98,17 @@ type ZeroTier / Radmin VPN / Tailscale.
   *fixe* pour rejouer une seed. Appliqué au prochain démarrage.
 - **server.properties** : tous les réglages avec le bon contrôle (interrupteur, menu, nombre
   borné), recherche intégrée. `difficulty`, `gamemode`, `white-list` et `player-idle-timeout`
-  s'appliquent en direct ; le reste au redémarrage. Les clés pilotées par le panel
+  s'appliquent en direct ; le reste au prochain reset ou redémarrage (en Turbo, le remplaçant
+  est relancé pour en tenir compte). Les clés pilotées par le panel
   (`server-port`, `query.port`, `prevent-proxy-connections`, `level-seed`) sont verrouillées.
   Les clés inconnues (mods, versions futures) restent éditables en texte.
-- **Joueurs** : whitelist et OP. Serveur allumé, passe par la console (`whitelist add`, `op`) ;
-  éteint, le panel écrit les JSON. Si Mojang ne connaît pas le pseudo, UUID hors-ligne
-  (ne marche qu'en `online-mode=false`).
+- **Joueurs** : whitelist, OP et comptes crack. Serveur allumé, passe par la console
+  (`whitelist add`, `op`) ; éteint, le panel écrit les JSON. Si Mojang ne connaît pas le pseudo,
+  UUID hors-ligne (ne marche qu'avec les comptes crack acceptés).
 
-Réglages par défaut orientés speedrun : difficulté `hard`, `spawn-protection=0`,
-`sync-chunk-writes=false`, graine aléatoire.
+Réglages par défaut orientés speedrun : difficulté `hard`, `hardcore=true`, `spawn-protection=0`,
+`sync-chunk-writes=false`, graine aléatoire. Hardcore se désactive à la création dans
+*Options avancées*.
 
 ---
 
@@ -148,3 +156,4 @@ compatible, sinon télécharge un JRE portable dans `.runtime/` (sans droits adm
 | Ton pote ne se connecte pas | Port non redirigé, pare-feu, ou WSL2 sans réseau miroir. Voir [Jouer à deux](#jouer-à-deux). |
 | Le panel ne s'ouvre pas | Port 8765 pris : le panel bascule sur le suivant, l'adresse est affichée dans le terminal. |
 | « Connexion perdue » après un reset Turbo | Normal, c'est la bascule. « Se reconnecter ». |
+| « Hôte non autorisé » ou « Requête venant d'un autre site refusée » | Le panel ne répond qu'à sa propre page, ouverte via `localhost`, une IP ou le nom du PC. Protection contre les sites web qui tenteraient de le piloter. |

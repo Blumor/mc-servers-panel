@@ -7,9 +7,14 @@ jamais perdues à l'écriture.
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 BOOL, INT, STR, ENUM = "bool", "int", "str", "enum"
+
+# Le panel efface le dossier du monde à chaque reset : le nom doit rester un simple
+# dossier du serveur, jamais un chemin (« .. », « / », lecteur Windows...).
+LEVEL_NAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-]{0,63}$")
 
 # Clés pilotées par le panel : l'utilisateur les voit mais ne les édite pas ici.
 LOCKED = ("server-port", "query.port", "prevent-proxy-connections", "level-seed")
@@ -30,7 +35,7 @@ SCHEMA: tuple[dict, ...] = (
      "options": ["peaceful", "easy", "normal", "hard"], "default": "hard"},
     {"key": "gamemode", "group": "gameplay", "type": ENUM, "label": "Mode de jeu",
      "options": ["survival", "creative", "adventure", "spectator"], "default": "survival"},
-    {"key": "hardcore", "group": "gameplay", "type": BOOL, "label": "Hardcore", "default": "false",
+    {"key": "hardcore", "group": "gameplay", "type": BOOL, "label": "Hardcore", "default": "true",
      "hint": "Mort définitive, passage en spectateur."},
     {"key": "pvp", "group": "gameplay", "type": BOOL, "label": "PvP", "default": "true"},
     {"key": "force-gamemode", "group": "gameplay", "type": BOOL, "label": "Forcer le mode de jeu",
@@ -44,7 +49,8 @@ SCHEMA: tuple[dict, ...] = (
 
     # ------------------------------------------------------------------- world
     {"key": "level-name", "group": "world", "type": STR, "label": "Nom du monde", "default": "world",
-     "hint": "Changer ce nom crée un nouveau monde ; l'ancien reste sur le disque."},
+     "hint": "Changer ce nom crée un nouveau monde ; l'ancien reste sur le disque. "
+             "Lettres, chiffres, _ - . uniquement."},
     {"key": "level-type", "group": "world", "type": ENUM, "label": "Type de monde",
      "options": ["minecraft:normal", "minecraft:flat", "minecraft:large_biomes",
                  "minecraft:amplified", "minecraft:single_biome_surface"],
@@ -69,8 +75,11 @@ SCHEMA: tuple[dict, ...] = (
      "default": "false", "hint": "Seuls les joueurs de la liste peuvent se connecter."},
     {"key": "enforce-whitelist", "group": "players", "type": BOOL, "label": "Appliquer immédiatement",
      "default": "false", "hint": "Expulse les joueurs retirés de la whitelist sans attendre."},
-    {"key": "online-mode", "group": "players", "type": BOOL, "label": "Comptes Mojang vérifiés",
-     "default": "true", "hint": "Désactiver n'autorise que les comptes crackés. Laissez sur oui."},
+    # Affiché inversé (« invert ») : l'interrupteur dit « accepter », la valeur stockée est online-mode.
+    {"key": "online-mode", "group": "players", "type": BOOL, "label": "Accepter les comptes crack",
+     "default": "true", "invert": True,
+     "hint": "Activé = online-mode=false : plus aucune vérification Mojang, n'importe qui peut prendre "
+             "n'importe quel pseudo, y compris celui d'un OP. Uniquement entre joueurs de confiance."},
     {"key": "player-idle-timeout", "group": "players", "type": INT, "label": "Expulsion si inactif (min)",
      "min": 0, "max": 240, "default": "0", "hint": "0 = jamais."},
     {"key": "op-permission-level", "group": "players", "type": INT, "label": "Niveau des OP",
@@ -134,7 +143,7 @@ SPEEDRUN_DEFAULTS = {
     "enable-command-block": "false",
     "enforce-secure-profile": "false",
     "gamemode": "survival",
-    "hardcore": "false",
+    "hardcore": "true",
     "level-name": "world",
     "level-seed": "",
     "level-type": "minecraft:normal",
@@ -208,6 +217,9 @@ def coerce(key: str, value) -> str | None:
         if text in spec["options"]:
             return text
         return None
+
+    if key == "level-name":
+        return text if LEVEL_NAME_RE.match(text) else None
 
     return text.replace("\n", " ").replace("\r", "")
 

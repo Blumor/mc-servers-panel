@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import socket
 import sys
 import threading
 from pathlib import Path
@@ -60,6 +61,21 @@ def arch_slug() -> str:
     if m in ("i386", "i686", "x86"):
         return "x86-32"
     return "x64"
+
+
+def tune_listen_socket(sock: socket.socket) -> None:
+    """À appeler avant bind() sur tout socket d'écoute.
+
+    Linux/macOS : SO_REUSEADDR évite d'attendre la fin des connexions en TIME_WAIT.
+    Windows : SO_REUSEADDR autorise au contraire à se brancher sur un port déjà ouvert
+    par un autre programme ; on demande un port exclusif pour détecter les conflits.
+    """
+    if IS_WINDOWS:
+        exclusive = getattr(socket, "SO_EXCLUSIVEADDRUSE", None)
+        if exclusive is not None:
+            sock.setsockopt(socket.SOL_SOCKET, exclusive, 1)
+    else:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
 
 def ensure_dirs() -> None:

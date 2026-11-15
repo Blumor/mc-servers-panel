@@ -25,14 +25,19 @@ RESETTING = "resetting"
 INSTALLING = "installing"
 ERROR = "error"
 
-RE_DONE = re.compile(r'Done \(([\d.]+)s\)!')
-RE_JOIN = re.compile(r"]: ([A-Za-z0-9_]{2,16}) joined the game")
-RE_LEAVE = re.compile(r"]: ([A-Za-z0-9_]{2,16}) left the game")
+# Pseudo tel qu'écrit dans les logs. Volontairement large : un compte crack n'est pas tenu
+# à [A-Za-z0-9_]{3,16}. Exclure espaces, < > [ ] suffit à écarter le chat (« <Steve> ... »)
+# et le préfixe « [Not Secure] » des messages non signés.
+_NAME = r"[^\s<>\[\]]{1,16}"
+
+RE_DONE = re.compile(r"Done \(([\d.,]+)s\)!")  # virgule si la JVM formate selon la locale
+RE_JOIN = re.compile(r"]: (%s)(?: \(formerly known as %s\))? joined the game" % (_NAME, _NAME))
+RE_LEAVE = re.compile(r"]: (%s) left the game" % _NAME)
 RE_PROGRESS = re.compile(r"Preparing spawn area: (\d+)%")
 RE_SEED = re.compile(r"Seed: \[?(-?\d+)\]?")
 RE_DEATH = re.compile(
-    r"]: ([A-Za-z0-9_]{2,16}) (was |died|drowned|blew up|fell|burned|starved|suffocated|"
-    r"withered|hit the ground|went up in flames|tried to swim in lava|discovered the floor)"
+    r"]: (%s) (was |died|drowned|blew up|fell|burned|starved|suffocated|"
+    r"withered|hit the ground|went up in flames|tried to swim in lava|discovered the floor)" % _NAME
 )
 
 # Messages d'erreur Java -> explication actionnable côté UI.
@@ -49,7 +54,12 @@ FATAL_HINTS = (
 
 
 def _flags(ram_mb: int) -> list[str]:
-    """Flags JVM orientés démarrage rapide + GC court (dérivés des flags Aikar)."""
+    """Flags JVM orientés démarrage rapide + GC court (dérivés des flags Aikar).
+
+    Pas de -XX:+AlwaysPreTouch : utile sur un serveur qui tourne des semaines, il fait
+    toucher tout le tas au lancement. Ici chaque reset relance une JVM : ça rallongeait
+    le boot et, en Turbo, occupait d'emblée toute la RAM des deux serveurs.
+    """
     args = [
         "-Xms%dM" % ram_mb,
         "-Xmx%dM" % ram_mb,
@@ -58,7 +68,6 @@ def _flags(ram_mb: int) -> list[str]:
         "-XX:MaxGCPauseMillis=200",
         "-XX:+UnlockExperimentalVMOptions",
         "-XX:+DisableExplicitGC",
-        "-XX:+AlwaysPreTouch",
         "-XX:G1HeapWastePercent=5",
         "-XX:G1MixedGCCountTarget=4",
         "-XX:G1MixedGCLiveThresholdPercent=90",
@@ -142,8 +151,11 @@ class ServerProcess:
         self._on_state = on_state
         self._on_line = on_line
 
-    def set_state(self, state: str, error: str | None = None) -> None:
+    def set_state(self, state: str, error: str | None = None, only_for=None) -> None:
+        """only_for : ne change l'état que si ce processus est toujours le processus courant."""
         with self._lock:
+            if only_for is not None and self.proc is not only_for:
+                return
             if self.state == state and error == self.last_error:
                 return
             self.state = state
@@ -174,8 +186,10 @@ class ServerProcess:
             if self.alive:
                 raise RuntimeError("Le serveur %s tourne déjà." % self.server_id)
             self.workdir.mkdir(parents=True, exist_ok=True)
-            self._ready.clear()
-            self._exited.clear()
+            # Événements neufs à chaque lancement : le thread de lecture du processus tué
+            # juste avant (reset) ne peut plus réveiller ni dérégler celui-ci.
+            self._ready = threading.Event()
+            self._exited = threading.Event()
             self.players.clear()
             self.ready_at = None
             self.boot_seconds = None
@@ -202,45 +216,47 @@ class ServerProcess:
                 popen_kwargs["start_new_session"] = True
 
             try:
-                self.proc = subprocess.Popen(cmd, **popen_kwargs)
+                proc = subprocess.Popen(cmd, **popen_kwargs)
             except OSError as exc:
                 self.set_state(ERROR, "Lancement impossible: %s" % exc)
                 raise
+            self.proc = proc
 
             self.set_state(STARTING)
             self._pump = threading.Thread(
                 target=self._pump_output,
+                args=(proc, self._ready, self._exited),
                 name="mc-log-%s-%s" % (self.server_id, self.label),
                 daemon=True,
             )
             self._pump.start()
 
-    def _pump_output(self) -> None:
-        proc = self.proc
-        assert proc and proc.stdout
+    def _pump_output(self, proc: subprocess.Popen, ready: threading.Event, exited: threading.Event) -> None:
+        assert proc.stdout
         try:
             for raw in iter(proc.stdout.readline, b""):
+                if self.proc is not proc:
+                    continue  # processus déjà remplacé : on vide le tube sans toucher à l'état
                 line = raw.decode("utf-8", "replace").rstrip("\r\n")
-                if not line:
-                    continue
-                self._consume(line)
+                if line:
+                    self._consume(line, proc, ready)
         except (OSError, ValueError):
             pass
         finally:
             code = proc.wait()
-            self._exited.set()
-            self._ready.set()
-            if self.state not in (STOPPING, RESETTING):
-                if code != 0:
-                    hint = self.last_error or "Le serveur s'est arrêté (code %s)." % code
+            # État final posé avant de réveiller wait_ready() / kill() : ils lisent l'état.
+            if self.state not in (STOPPING, RESETTING) and code != 0:
+                hint = self.last_error or "Le serveur s'est arrêté (code %s)." % code
+                if self.proc is proc:
                     self.emit_line("[panel] Arrêt inattendu (code %s)" % code, "error")
-                    self.set_state(ERROR, hint)
-                else:
-                    self.set_state(STOPPED)
+                self.set_state(ERROR, hint, only_for=proc)
             else:
-                self.set_state(STOPPED)
+                self.set_state(STOPPED, only_for=proc)
+            ready.set()
+            exited.set()
 
-    def _consume(self, line: str) -> None:
+    def _consume(self, line: str, proc: subprocess.Popen | None = None,
+                 ready: threading.Event | None = None) -> None:
         level = "info"
         low = line.lower()
         if "/error" in low or "exception" in low or "severe" in low:
@@ -261,11 +277,11 @@ class ServerProcess:
 
         m = RE_DONE.search(line)
         if m:
-            self.boot_seconds = float(m.group(1))
+            self.boot_seconds = float(m.group(1).replace(",", "."))
             self.ready_at = time.time()
             self.spawn_progress = 100
-            self._ready.set()
-            self.set_state(RUNNING)
+            self.set_state(RUNNING, only_for=proc)
+            (ready or self._ready).set()
 
         m = RE_SEED.search(line)
         if m:
@@ -289,8 +305,8 @@ class ServerProcess:
         self.emit_line(line, level)
 
     def wait_ready(self, timeout: float) -> bool:
-        ok = self._ready.wait(timeout)
-        return ok and self.state == RUNNING
+        ready = self._ready
+        return ready.wait(timeout) and self.state == RUNNING
 
     # ------------------------------------------------------------------ stop
     def send(self, command: str) -> bool:
@@ -312,15 +328,17 @@ class ServerProcess:
                 self.set_state(STOPPED)
                 return
             self.set_state(STOPPING)
+            exited = self._exited
         if graceful:
             if self.send("stop"):
-                if self._exited.wait(timeout):
+                if exited.wait(timeout):
                     return
             self.emit_line("[panel] Arrêt propre trop lent, passage en force.", "warn")
         self.kill()
 
     def kill(self) -> None:
-        proc = self.proc
+        with self._lock:
+            proc, exited = self.proc, self._exited
         if not proc or proc.poll() is not None:
             self.set_state(STOPPED)
             return
@@ -342,8 +360,8 @@ class ServerProcess:
                 proc.kill()
             except OSError:
                 pass
-        self._exited.wait(8)
-        self.set_state(STOPPED)
+        exited.wait(8)
+        self.set_state(STOPPED, only_for=proc)
 
     def snapshot(self) -> dict:
         return {

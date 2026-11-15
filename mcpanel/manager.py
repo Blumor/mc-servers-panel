@@ -47,7 +47,7 @@ def free_port(start: int, avoid: set[int] | None = None) -> int:
         if port in avoid:
             continue
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            cfg.tune_listen_socket(sock)
             try:
                 sock.bind(("0.0.0.0", port))
             except OSError:
@@ -65,19 +65,43 @@ def port_busy(port: int) -> bool:
             return False
 
 
+_local_ip_cache = {"ip": "127.0.0.1", "at": 0.0}
+
+
 def local_ip() -> str:
+    """IP de la machine sur le réseau local. En cache : chaque snapshot (1/s par serveur) l'affiche."""
+    now = time.time()
+    if now - _local_ip_cache["at"] < 30:
+        return _local_ip_cache["ip"]
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.settimeout(0.4)
             sock.connect(("8.8.8.8", 80))
-            return sock.getsockname()[0]
+            ip = sock.getsockname()[0]
     except OSError:
-        return "127.0.0.1"
+        ip = "127.0.0.1"
+    _local_ip_cache.update(ip=ip, at=now)
+    return ip
+
+
+def strictly_inside(path: Path, root: Path) -> bool:
+    """path est-il dans root (liens résolus), sans être root lui-même ?"""
+    try:
+        target, base = path.resolve(), root.resolve()
+    except OSError:
+        return False
+    return target != base and target.is_relative_to(base)
 
 
 def async_delete(path: Path) -> None:
-    """Déplace puis supprime en tâche de fond: le renommage est instantané."""
+    """Déplace puis supprime en tâche de fond: le renommage est instantané.
+
+    Garde-fou : rien n'est jamais effacé hors de servers/, quoi que contienne la config.
+    """
     if not path.exists():
+        return
+    if not strictly_inside(path, cfg.SERVERS_DIR):
+        print("[panel] suppression refusée, hors de servers/ : %s" % path)
         return
     cfg.TRASH_DIR.mkdir(parents=True, exist_ok=True)
     grave = cfg.TRASH_DIR / ("%s-%s" % (path.name, uuid.uuid4().hex[:8]))
@@ -125,6 +149,7 @@ class ManagedServer:
         self.create_notes: list[str] = []
         self._java: str | None = None
         self._jar: Path | None = None
+        self._uuid_lock = threading.Lock()
 
     # ------------------------------------------------------------ persistence
     @property
@@ -177,6 +202,9 @@ class ManagedServer:
 
     def _proxy_event(self, message: str) -> None:
         BUS.emit("log", {"server": self.id, "slot": "proxy", "line": "[turbo] %s" % message, "lvl": "panel", "t": time.time()})
+
+    def _panel_log(self, message: str, level: str = "panel") -> None:
+        BUS.emit("log", {"server": self.id, "line": "[panel] %s" % message, "lvl": level, "t": time.time()})
 
     def _on_slot_line(self, proc: ServerProcess, item: dict) -> None:
         if proc.label != self.live_label and proc.state != RUNNING:
@@ -325,7 +353,35 @@ class ManagedServer:
             return str(self.meta.get("seed") or "")
         return ""  # vide = Minecraft tire une graine aléatoire
 
+    def _sync_player_uuids(self) -> None:
+        """Après une bascule comptes crack <-> comptes officiels, recalcule les UUID de la
+        whitelist et des OP (voir players.rekey).
+
+        Appelé juste avant un lancement : aucun Minecraft n'utilise alors les fichiers
+        canoniques, sinon il les réécrirait avec les anciens UUID en s'arrêtant.
+        """
+        online = props.read(self.settings_path()).get("online-mode", "true") != "false"
+        mode = "online" if online else "offline"
+        with self._uuid_lock:
+            previous = self.meta.get("uuid_mode")
+            if previous == mode:
+                return
+            if previous is not None:  # None : serveur d'avant cette fonction, rien à convertir
+                unresolved: list[str] = []
+                for which in ("whitelist", "ops"):
+                    unresolved += players.rekey(self._list_path(which), online)
+                # usercache.json associe pseudo -> UUID : périmé après la bascule.
+                for cache in [self.dir / "usercache.json", *self.dir.glob(".slots/*/usercache.json")]:
+                    cache.unlink(missing_ok=True)
+                message = "UUID whitelist/OP convertis pour les comptes %s" % ("officiels" if online else "crack")
+                if unresolved:
+                    message += " ; sans compte Mojang, inchangés : %s" % ", ".join(sorted(set(unresolved)))
+                self._panel_log(message, "warn" if unresolved else "panel")
+            self.meta["uuid_mode"] = mode
+            self.save()
+
     def prepare_dir(self, path: Path, port: int, fresh_seed: bool = False) -> None:
+        self._sync_player_uuids()
         path.mkdir(parents=True, exist_ok=True)
         (path / "eula.txt").write_text(
             "#Accepte via MC Speedrun Panel\neula=true\n", encoding="utf-8"
@@ -353,7 +409,15 @@ class ManagedServer:
     def world_dirs(self, path: Path) -> list[Path]:
         level = props.read(path / "server.properties").get("level-name", "world")
         names = {level, level + "_nether", level + "_the_end", "world", "world_nether", "world_the_end"}
-        return [path / n for n in names if (path / n).exists()]
+        root = path.resolve()
+        found = []
+        for name in names:
+            candidate = path / name
+            # Un vrai dossier, enfant direct du serveur : un level-name du genre « ../.. »
+            # (fichier édité à la main) ne doit jamais faire effacer autre chose que le monde.
+            if candidate.is_dir() and not candidate.is_symlink() and candidate.resolve().parent == root:
+                found.append(candidate)
+        return found
 
     def wipe_world(self, path: Path) -> None:
         for d in self.world_dirs(path):
@@ -364,7 +428,7 @@ class ManagedServer:
                 async_delete(target)
 
     # ---------------------------------------------------------------- actions
-    def start(self, report=None) -> dict:
+    def start(self, report=None, fresh_seed: bool = False) -> dict:
         with self.lock:
             if self.live.alive:
                 return {"already": True}
@@ -387,7 +451,7 @@ class ManagedServer:
         self.standby_label = None
         proc = self.slot(MAIN)
         self.run_started = None
-        self._launch_slot(proc, public_port, ram, fresh_seed=False, report=report)
+        self._launch_slot(proc, public_port, ram, fresh_seed=fresh_seed, report=report)
         if report:
             report("Serveur prêt en %.1fs" % (proc.boot_seconds or 0), 1.0)
         BUS.emit("server", self.snapshot())
@@ -475,22 +539,20 @@ class ManagedServer:
         if turbo and self.proxy and self.proxy.running:
             standby = self.standby
             if standby and standby.state == RUNNING and standby.alive:
-                result = self._swap(standby, java, jar, ram, report)
-                self.last_reset_ms = int((time.time() - t0) * 1000)
-                self.meta["resets"] = int(self.meta.get("resets", 0)) + 1
-                self.save()
-                BUS.emit("server", self.snapshot())
-                return {**result, "ms": self.last_reset_ms}
+                return self._count_reset(t0, self._swap(standby, java, jar, ram, report))
             if standby and standby.state == STARTING:
                 if report:
                     report("Le remplaçant finit de démarrer...", 0.4)
                 if standby.wait_ready(120):
-                    result = self._swap(standby, java, jar, ram, report)
-                    self.last_reset_ms = int((time.time() - t0) * 1000)
-                    self.meta["resets"] = int(self.meta.get("resets", 0)) + 1
-                    self.save()
-                    BUS.emit("server", self.snapshot())
-                    return {**result, "ms": self.last_reset_ms}
+                    return self._count_reset(t0, self._swap(standby, java, jar, ram, report))
+
+        if not self.live.alive:
+            # Rien ne tourne (arrêté, planté) : monde neuf puis démarrage normal, qui remonte
+            # aussi proxy et remplaçant en Turbo. Relancer le seul slot laissait un backend
+            # Turbo sans proxy, injoignable sur le port public.
+            self.stop(graceful=False)  # coupe un éventuel remplaçant à moitié démarré
+            self.wipe_world(self.slot(SLOT_A).workdir if turbo else self.dir)
+            return self._count_reset(t0, {**self.start(report, fresh_seed=True), "cold": True})
 
         # Reset à froid: on tue, on jette le monde, on relance.
         live = self.live
@@ -510,13 +572,17 @@ class ManagedServer:
         if turbo and self.proxy and self.proxy.running:
             self.proxy.set_backend(port, drop=True)
             self._warm_standby(java, jar, ram)
+        result = self._count_reset(t0, {"cold": True, "boot": live.boot_seconds})
+        if report:
+            report("Monde neuf prêt en %.1fs" % (result["ms"] / 1000), 1.0)
+        return result
+
+    def _count_reset(self, t0: float, result: dict) -> dict:
         self.last_reset_ms = int((time.time() - t0) * 1000)
         self.meta["resets"] = int(self.meta.get("resets", 0)) + 1
         self.save()
-        if report:
-            report("Monde neuf prêt en %.1fs" % (self.last_reset_ms / 1000), 1.0)
         BUS.emit("server", self.snapshot())
-        return {"cold": True, "ms": self.last_reset_ms, "boot": live.boot_seconds}
+        return {**result, "ms": self.last_reset_ms}
 
     def _swap(self, standby: ServerProcess, java: str, jar: Path, ram: int, report=None) -> dict:
         """Bascule instantanée sur le serveur de secours déjà chargé."""
@@ -582,6 +648,8 @@ class ManagedServer:
                 slot_values.pop("server-port", None)
                 slot_values.pop("query.port", None)
                 props.write(proc.workdir / "server.properties", slot_values)
+        if running and restart_needed:
+            self._refresh_standby()
 
         BUS.emit("server", self.snapshot())
         return {
@@ -590,6 +658,28 @@ class ManagedServer:
             "restart_needed": restart_needed if running else [],
             "live": live_applied,
         }
+
+    def _refresh_standby(self) -> None:
+        """Turbo : le remplaçant tourne déjà avec l'ancienne config. On le relance pour
+        que le prochain reset donne un monde avec les nouveaux réglages."""
+        if not self.meta.get("turbo") or not self.deps_ready:
+            return
+        standby = self.standby
+        if not standby or not standby.alive:
+            return  # pas lancé ou en recyclage : il repartira de la nouvelle config
+
+        def job(report):
+            # Exécuté dans la file du serveur : jamais en même temps qu'un reset.
+            current = self.standby
+            if not current or not current.alive:
+                return {"skipped": True}
+            report("Remplaçant Turbo relancé avec les nouveaux réglages", 0.3)
+            current.set_state(RESETTING)  # ne doit plus passer pour un remplaçant prêt
+            current.kill()
+            self._warm_standby(self._java, self._jar, int(self.meta.get("ram_mb") or cfg.suggested_ram_mb()))
+            return {"rewarm": True}
+
+        RUNNER.submit("standby", job, target=self.id, dedupe=True)
 
     # ------------------------------------------------------- whitelist et OP
     def _list_path(self, which: str) -> Path:
@@ -792,6 +882,8 @@ class Manager:
                         notes.append("%s : compte introuvable chez Mojang, UUID hors-ligne utilisé." % player_name)
                 except ValueError as exc:
                     notes.append("%s : %s" % (player_name, exc))
+        srv.meta["uuid_mode"] = "online" if online_mode else "offline"
+        srv.save()
         srv.create_notes = notes
         BUS.emit("servers", self.list())
         return srv
@@ -803,7 +895,9 @@ class Manager:
             srv.destroy()
         BUS.emit("servers", self.list())
 
-    def update(self, sid: str, patch: dict) -> ManagedServer:
+    def update(self, sid: str, patch: dict) -> tuple[ManagedServer, dict]:
+        """Retourne (serveur, résultat de apply_settings) : l'UI y lit les réglages refusés
+        et ceux qui n'ont pas pu s'appliquer à chaud."""
         srv = self.get(sid)
         allowed = ("name", "version", "ram_mb", "port", "turbo", "seed", "seed_mode")
         for key in allowed:
@@ -814,10 +908,9 @@ class Manager:
         if "port" in patch:
             srv.meta["port"] = int(patch["port"] or cfg.DEFAULT_PORT)
         srv.save()
-        if patch.get("settings"):
-            srv.apply_settings(patch["settings"])
+        result = srv.apply_settings(patch["settings"]) if patch.get("settings") else {}
         BUS.emit("server", srv.snapshot())
-        return srv
+        return srv, result
 
     def shutdown_all(self) -> None:
         threads = []

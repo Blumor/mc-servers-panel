@@ -14,6 +14,8 @@ import socket
 import threading
 import time
 
+from . import config as cfg
+
 BUFFER = 65536
 
 
@@ -41,7 +43,7 @@ class TurboProxy:
             if self.running:
                 return
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            cfg.tune_listen_socket(sock)
             try:
                 sock.bind(("0.0.0.0", self.listen_port))
             except OSError as exc:
@@ -61,11 +63,20 @@ class TurboProxy:
         self._running.clear()
         with self._lock:
             sock, self._sock = self._sock, None
+            thread, self._thread = self._thread, None
         if sock:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)  # réveille accept() tout de suite
+            except OSError:
+                pass
             try:
                 sock.close()
             except OSError:
                 pass
+        # Tant que la boucle d'accept attend encore sur l'ancien socket, le noyau le garde
+        # ouvert : relancer le proxy juste derrière (restart, reset) échouait « port occupé ».
+        if thread and thread is not threading.current_thread():
+            thread.join(timeout=2)
         self.drop_clients()
 
     def set_backend(self, port: int | None, drop: bool = True) -> None:
@@ -119,6 +130,9 @@ class TurboProxy:
         except OSError:
             self._close(client)
             return
+        # Le délai ne vaut que pour la connexion : laissé en place, il coupait la session
+        # dès que le serveur se taisait 8 s (lag, chargement d'un pack de ressources...).
+        upstream.settimeout(None)
 
         for s in (client, upstream):
             try:

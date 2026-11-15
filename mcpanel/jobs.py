@@ -66,9 +66,18 @@ class JobRunner:
             ids = self._order[-limit:]
             return [self._jobs[i].as_dict() for i in ids if i in self._jobs]
 
-    def submit(self, kind: str, fn, target: str = "global", serialize: bool = True) -> Job:
-        job = Job(kind, target)
+    def submit(self, kind: str, fn, target: str = "global", serialize: bool = True,
+               dedupe: bool = False) -> Job:
+        """dedupe=True : si la même action attend ou tourne déjà sur cette cible, on la
+        renvoie au lieu d'en empiler une seconde (double clic, touche R maintenue...)."""
         with self._lock:
+            if dedupe:
+                for job_id in reversed(self._order):
+                    other = self._jobs.get(job_id)
+                    if other and other.kind == kind and other.target == target \
+                            and other.status in ("pending", "running"):
+                        return other
+            job = Job(kind, target)
             self._jobs[job.id] = job
             self._order.append(job.id)
             while len(self._order) > _MAX_KEEP:

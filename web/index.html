@@ -426,6 +426,7 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--stroke-2);bo
           <div class="state-pill st-stopped" id="statePill"><span class="dot"></span><span>Arrêté</span></div>
           <div class="chip click" id="chipAddr" title="Copier">📋 <b>—</b></div>
           <div class="chip" id="chipVer">📦 <b>—</b></div>
+          <div class="chip hidden" id="chipFlags"></div>
           <div style="margin-left:auto" class="chip" id="chipResets">🔁 <b>0</b> resets</div>
         </div>
         <div class="card-b" style="padding-top:4px">
@@ -519,10 +520,16 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--stroke-2);bo
   </div>
   <div class="field"><label>Difficulté</label><select id="fDiff">
     <option value="hard">Hard</option><option value="normal">Normal</option><option value="easy">Easy</option><option value="peaceful">Peaceful</option></select></div>
-  <div class="turbo-row" style="margin:6px 0 18px">
+  <div class="turbo-row" style="margin:6px 0 14px">
     <button class="switch" id="fTurbo" role="switch" aria-checked="false"><i></i></button>
     <div style="flex:1"><div style="font-size:13.5px;font-weight:750">Mode Turbo</div>
       <div class="hint">Double la RAM utilisée, mais le reset devient instantané.</div></div>
+  </div>
+  <div class="turbo-row" style="margin:0 0 18px">
+    <button class="switch" id="fCrack" role="switch" aria-checked="false"><i></i></button>
+    <div style="flex:1"><div style="font-size:13.5px;font-weight:750">Accepter les comptes crack</div>
+      <div class="hint">Pour jouer avec des potes sans compte Minecraft officiel. Plus aucune vérification :
+        n'importe qui peut se connecter sous n'importe quel pseudo, y compris le tien.</div></div>
   </div>
 
   <details class="pgroup" id="fAdvanced">
@@ -598,6 +605,13 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--stroke-2);bo
         <div style="font-size:11.5px;color:var(--dim-2)">Seuls les joueurs ci-dessous peuvent se connecter.</div>
       </div>
     </div>
+    <div class="turbo-row" style="margin:12px 0 6px">
+      <button class="switch" id="sCrackToggle" role="switch" aria-checked="false"><i></i></button>
+      <div style="flex:1;min-width:170px">
+        <div style="font-size:13.5px;font-weight:750">Accepter les comptes crack</div>
+        <div style="font-size:11.5px;color:var(--dim-2)">online-mode=false. Pris en compte au prochain reset ou démarrage.</div>
+      </div>
+    </div>
     <div class="sectitle">Whitelist <span class="n" id="sWlCount"></span></div>
     <div class="addrow">
       <input id="sWlInput" placeholder="Pseudo puis Entrée…" autocomplete="off" spellcheck="false" />
@@ -647,7 +661,7 @@ const API = {
 const S = {
   servers: [], current: null, system: {}, versions: [],
   autoscroll: true, connected: false, history: [], hIdx: -1,
-  pendingReset: 0, lines: 0, lastTickAt: 0,
+  pendingReset: 0, lines: 0, lastTickAt: 0, lastResetAt: 0, playersSig: null,
   schema: null, propDefaults: {}, newWhitelist: [], newOps: [],
 };
 const $ = (id) => document.getElementById(id);
@@ -674,8 +688,33 @@ function fmtDur(sec){
   return h ? `${h}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`;
 }
 function copy(text, label){
-  navigator.clipboard?.writeText(text).then(()=>toast((label||'Copié')+' : '+text,'ok',2200))
-    .catch(()=>toast('Copie impossible','err'));
+  const done = () => toast((label||'Copié')+' : '+text,'ok',2200);
+  const fail = () => toast('Copie impossible','err');
+  if (navigator.clipboard && window.isSecureContext)
+    navigator.clipboard.writeText(text).then(done).catch(() => legacyCopy(text) ? done() : fail());
+  else if (legacyCopy(text)) done();
+  else fail();
+}
+/* En --lan (http://IP-du-PC), la page n'est pas un « contexte sécurisé » : pas de navigator.clipboard. */
+function legacyCopy(text){
+  const ta = el('textarea'); ta.value = text; ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+  document.body.append(ta); ta.select();
+  let ok = false; try { ok = document.execCommand('copy'); } catch(e){}
+  ta.remove();
+  return ok;
+}
+/* Chips « icône + valeur » : textContent, jamais innerHTML (version, IP... viennent de l'extérieur). */
+function setChip(id, icon, value, suffix){
+  const chip = $(id);
+  chip.textContent = icon + ' ';
+  chip.append(el('b', '', value));
+  if (suffix) chip.append(' ' + suffix);
+}
+const isOn = (id) => $(id).getAttribute('aria-checked') === 'true';
+function flipSwitch(e){
+  const b = e.currentTarget;
+  b.setAttribute('aria-checked', b.getAttribute('aria-checked') === 'true' ? 'false' : 'true');
 }
 document.addEventListener('pointermove', (e)=>{
   const b = e.target.closest?.('.btn'); if(!b) return;
@@ -693,7 +732,12 @@ const STATE_LABEL = {
 function dotClass(state){
   return state==='running' ? 'on' : state==='error' ? 'off' : state==='stopped' ? '' : 'warn';
 }
+let tabsSig = '';
 function renderTabs(){
+  // Appelé à chaque tick (1/s) : on ne reconstruit que si un onglet a changé.
+  const sig = S.current + '|' + S.servers.map(s => s.id + ':' + s.name + ':' + s.state).join(',');
+  if (sig === tabsSig) return;
+  tabsSig = sig;
   const box = $('tabs'); box.innerHTML = '';
   S.servers.forEach((s, i) => {
     const t = el('button', 'tab' + (s.id===S.current?' on':''));
@@ -729,9 +773,15 @@ function renderInner(){
   const pill = $('statePill'); pill.className = 'state-pill ' + cls;
   pill.innerHTML = ''; pill.append(el('span','dot ' + dotClass(s.state)), el('span','',lab));
 
-  $('chipAddr').innerHTML = '📋 <b>'+s.address+'</b>';
-  $('chipVer').innerHTML = '📦 <b>'+s.version+'</b>';
-  $('chipResets').innerHTML = '🔁 <b>'+s.resets+'</b> resets';
+  setChip('chipAddr', '📋', s.address);
+  setChip('chipVer', '📦', s.version);
+  setChip('chipResets', '🔁', String(s.resets), 'resets');
+  const st = s.settings || {}, crack = st['online-mode'] === 'false';
+  const flags = [st.hardcore === 'true' ? '💀 Hardcore' : '', crack ? '🔓 Comptes crack' : ''].filter(Boolean);
+  const chipFlags = $('chipFlags');
+  chipFlags.textContent = flags.join(' · ');
+  chipFlags.title = crack ? 'Comptes crack acceptés : les pseudos ne sont pas vérifiés' : '';
+  chipFlags.classList.toggle('hidden', !flags.length);
 
   const busy = ['starting','stopping','resetting','installing'].includes(s.state);
   const up = s.state === 'running';
@@ -759,13 +809,19 @@ function renderInner(){
   $('mBoot').textContent = live.boot_seconds ? live.boot_seconds.toFixed(1)+'s' : (busy ? (live.spawn_progress||0)+'%' : '—');
   $('mRam').textContent = (s.ram_mb/1024).toFixed(1)+' Go' + (s.turbo ? ' ×2' : '');
 
-  const pbox = $('players'); pbox.innerHTML = '';
-  if (!live.players || !live.players.length) pbox.append(el('span','muted', up?'Personne connecté':'Serveur hors ligne'));
-  else live.players.forEach(p => {
-    const c = el('span','pl'); const img = el('img'); img.src = 'https://minotar.net/avatar/'+encodeURIComponent(p)+'/24';
-    img.onerror = () => { img.replaceWith(el('span','','👤')); };
-    c.append(img, el('span','',p)); pbox.append(c);
-  });
+  // Reconstruit seulement si la liste change : sinon les avatars clignotent à chaque tick.
+  const names = live.players || [];
+  const psig = s.id + (up ? '+' : '-') + names.join(',');
+  if (psig !== S.playersSig){
+    S.playersSig = psig;
+    const pbox = $('players'); pbox.innerHTML = '';
+    if (!names.length) pbox.append(el('span','muted', up?'Personne connecté':'Serveur hors ligne'));
+    else names.forEach(p => {
+      const c = el('span','pl'); const img = el('img'); img.src = 'https://minotar.net/avatar/'+encodeURIComponent(p)+'/24';
+      img.onerror = () => { img.replaceWith(el('span','','👤')); };
+      c.append(img, el('span','',p)); pbox.append(c);
+    });
+  }
 
   if (s.state === 'error' && live.error) $('brandsub').textContent = live.error.slice(0,60);
   else $('brandsub').textContent = up ? 'serveur en ligne' : 'prêt';
@@ -774,9 +830,9 @@ function renderInner(){
 function renderSystem(){
   const sys = S.system || {};
   const jv = sys.java_best;
-  $('chipJava').innerHTML = '☕ <b>' + (jv ? 'Java '+jv : 'auto') + '</b>';
-  $('chipIp').innerHTML = '🏠 <b>' + (sys.local_ip || '—') + '</b>';
-  if (S.publicIp) $('chipPub').innerHTML = '🌐 <b>' + S.publicIp + '</b>';
+  setChip('chipJava', '☕', jv ? 'Java '+jv : 'auto');
+  setChip('chipIp', '🏠', sys.local_ip || '—');
+  if (S.publicIp) setChip('chipPub', '🌐', S.publicIp);
   const ram = Math.max(2048, Math.min(16384, (sys.ram_total_mb||8192)));
   $('fRam').max = ram; $('sRam').max = ram;
   $('fRamHint').textContent = 'RAM détectée : ' + ((sys.ram_total_mb||0)/1024).toFixed(1) + ' Go — conseillé ' +
@@ -873,6 +929,11 @@ function onJob(job){
 /* ============================================================ ACTIONS ======= */
 async function act(kind, btn){
   const s = cur(); if (!s) return;
+  if (kind === 'reset'){
+    // Anti double-clic : en Turbo la bascule prend 1 ms, un 2e reset effacerait le monde tout neuf.
+    if (Date.now() - S.lastResetAt < 1200) return;
+    S.lastResetAt = Date.now();
+  }
   if (btn) fireBtn(btn);
   try { await API.post('/api/servers/'+s.id+'/'+kind, {}); }
   catch(e){ toast(e.message, 'err', 6000); }
@@ -940,14 +1001,16 @@ function makeSwitch(on){
 }
 function tagEl(cls, text){ return el('span','tag '+cls, text); }
 
-/** Construit le formulaire et renvoie { read(), reset(), filter(q) }. */
+/** Construit le formulaire et renvoie { read(), setSaved(key, value), filter(q) }.
+ *  opts.exclude : clés à ne pas afficher (pilotées par un autre contrôle de la fenêtre). */
 function buildPropsForm(container, schema, values, opts){
   opts = opts || {};
   container.innerHTML = '';
-  const fields = new Map();          // key -> {row, get, initial, spec}
+  const fields = new Map();          // key -> {row, get, initial, spec, setSaved}
   const known = new Set(schema.fields.map(f => f.key));
+  const exclude = new Set(opts.exclude || []);
   const buckets = new Map(schema.groups.map(g => [g.id, []]));
-  schema.fields.forEach(f => buckets.get(f.group).push(f));
+  schema.fields.forEach(f => { if (!exclude.has(f.key)) buckets.get(f.group).push(f); });
 
   // Clés présentes dans le fichier mais absentes du schéma : mods, plugins,
   // versions plus récentes. On les édite en texte plutôt que de les cacher.
@@ -983,6 +1046,12 @@ function buildPropsForm(container, schema, values, opts){
       }
       return changed;
     },
+    /** Valeur déjà enregistrée ailleurs (interrupteur rapide) : met la ligne à jour
+     *  sans reconstruire le formulaire, donc sans perdre les modifications en cours. */
+    setSaved(key, value){
+      const f = fields.get(key);
+      if (f) f.setSaved(String(value));
+    },
     filter(query){
       const q = (query||'').trim().toLowerCase();
       container.querySelectorAll('details.pgroup').forEach(det => {
@@ -1015,30 +1084,37 @@ function propRow(spec, values, fields){
   if (tags.childElementCount) lbl.append(tags);
 
   const ctl = el('div','ctl');
-  let get;
+  let get, set;
   if (spec.type === 'bool'){
-    const sw = makeSwitch(raw === 'true');
+    // invert : l'interrupteur montre l'inverse de la valeur (« accepter les crack » = online-mode=false).
+    const inv = !!spec.invert;
+    const sw = makeSwitch((raw === 'true') !== inv);
     if (spec.locked) sw.disabled = true;
     ctl.append(sw);
-    get = () => sw.getAttribute('aria-checked') === 'true' ? 'true' : 'false';
+    get = () => ((sw.getAttribute('aria-checked') === 'true') !== inv) ? 'true' : 'false';
+    set = v => sw.setAttribute('aria-checked', String((v === 'true') !== inv));
     sw.addEventListener('change', mark);
   } else if (spec.type === 'enum'){
     const sel = document.createElement('select');
     (spec.options||[]).forEach(o => { const op = el('option','', o.replace('minecraft:','')); op.value = o; sel.append(op); });
     if (!spec.options.includes(raw)) { const op = el('option','', raw); op.value = raw; sel.append(op); }
     sel.value = raw; sel.disabled = !!spec.locked; ctl.append(sel);
-    get = () => sel.value; sel.addEventListener('change', mark);
+    get = () => sel.value; set = v => { sel.value = v; };
+    sel.addEventListener('change', mark);
   } else {
     const inp = document.createElement('input');
     inp.type = spec.type === 'int' ? 'number' : 'text';
     if (spec.min != null) inp.min = spec.min;
     if (spec.max != null) inp.max = spec.max;
     inp.value = raw; inp.disabled = !!spec.locked; ctl.append(inp);
-    get = () => inp.value.trim(); inp.addEventListener('input', mark);
+    get = () => inp.value.trim(); set = v => { inp.value = v; };
+    inp.addEventListener('input', mark);
   }
   row.append(lbl, ctl);
-  fields.set(spec.key, {row, get, initial: raw, spec});
-  function mark(){ row.classList.toggle('changed', get() !== raw); }
+  const field = {row, get, initial: raw, spec};
+  field.setSaved = v => { set(v); field.initial = v; mark(); };
+  fields.set(spec.key, field);
+  function mark(){ row.classList.toggle('changed', get() !== field.initial); }
   return row;
 }
 
@@ -1076,6 +1152,7 @@ async function openCreate(){
   S.newWhitelist = []; S.newOps = [];
   drawNewPlayers();
   $('fAdvanced').open = false;
+  $('fCrack').setAttribute('aria-checked', 'false');  // option sensible : toujours repartir de « non »
 
   if (!S.versions.length){
     try {
@@ -1092,7 +1169,8 @@ async function openCreate(){
     const base = {};
     schema.fields.forEach(f => base[f.key] = f.default || '');
     Object.assign(base, S.propDefaults);
-    createForm = buildPropsForm($('fPropForm'), schema, base);
+    // online-mode a son interrupteur dédié plus haut : pas de doublon dans les options avancées.
+    createForm = buildPropsForm($('fPropForm'), schema, base, {exclude: ['online-mode']});
   } catch(e){ toast('Schéma des propriétés indisponible : '+e.message, 'err'); }
 }
 function drawNewPlayers(){
@@ -1118,16 +1196,21 @@ $('fPropSearch').addEventListener('input', e => createForm && createForm.filter(
 
 $('btnNew').onclick = openCreate; $('btnCreateFirst').onclick = openCreate;
 $('fRam').oninput = e => $('fRamLab').textContent = e.target.value + ' Mo';
-$('fTurbo').onclick = e => { const b = e.currentTarget; b.setAttribute('aria-checked', b.getAttribute('aria-checked')==='true'?'false':'true'); };
+$('fTurbo').onclick = flipSwitch;
+$('fCrack').onclick = flipSwitch;
 
 $('btnCreate').onclick = async () => {
-  const settings = Object.assign({difficulty: $('fDiff').value}, createForm ? createForm.read() : {});
+  const btn = $('btnCreate');
+  if (btn.disabled) return;  // double clic = deux serveurs créés
+  const settings = Object.assign(
+    {difficulty: $('fDiff').value, 'online-mode': isOn('fCrack') ? 'false' : 'true'},
+    createForm ? createForm.read() : {});
   const body = {
     name: $('fName').value || 'Speedrun',
     version: $('fVersion').value,
     ram_mb: +$('fRam').value,
     port: +$('fPort').value,
-    turbo: $('fTurbo').getAttribute('aria-checked') === 'true',
+    turbo: isOn('fTurbo'),
     seed_mode: $('fSeedMode').value,
     seed: $('fSeed').value.trim(),
     settings,
@@ -1135,6 +1218,7 @@ $('btnCreate').onclick = async () => {
     ops: S.newOps,
     start: true,
   };
+  btn.disabled = true;
   try {
     const r = await API.post('/api/servers', body);
     closeModal('scrimNew');
@@ -1143,6 +1227,7 @@ $('btnCreate').onclick = async () => {
     (r.notes || []).forEach(n => toast(n, 'err', 8000));
     await refresh(); loadLogs(r.server.id);
   } catch(e){ toast(e.message, 'err', 7000); }
+  finally { btn.disabled = false; }
 };
 
 /* ----------------------------------------------------------------- réglages */
@@ -1182,13 +1267,17 @@ async function loadPlayers(id){
 }
 function drawPlayers(r){
   $('sWlToggle').setAttribute('aria-checked', String(!!r.whitelist_enabled));
+  $('sCrackToggle').setAttribute('aria-checked', String(!r.online_mode));
   $('sWlCount').textContent = r.whitelist.length ? r.whitelist.length + ' joueur(s)' : '';
   $('sOpCount').textContent = r.ops.length ? r.ops.length + ' joueur(s)' : '';
   renderPlayerChips($('sWlList'), r.whitelist, n => editPlayer('whitelist','remove',n));
   renderPlayerChips($('sOpList'), r.ops, n => editPlayer('ops','remove',n));
   const note = $('sPlayersNote'); note.innerHTML = '';
   if (r.note) note.append(el('div','note warn', r.note));
-  else if (!r.online_mode) note.append(el('div','note','Serveur en online-mode=false : les UUID sont calculés localement.'));
+  if (!r.online_mode) note.append(el('div','note warn',
+    'Comptes crack acceptés : aucun pseudo n’est vérifié. Quelqu’un qui connaît l’adresse peut entrer ' +
+    'sous ton pseudo ou celui d’un OP, et la whitelist ne l’arrête pas (elle se base sur le pseudo). ' +
+    'Ne donne l’adresse qu’à des gens de confiance.'));
 }
 async function editPlayer(which, action, player){
   const s = cur(); if (!s) return;
@@ -1215,9 +1304,24 @@ $('sWlToggle').onclick = async () => {
   const next = sw.getAttribute('aria-checked') !== 'true';
   sw.setAttribute('aria-checked', String(next));
   try {
-    await API.post('/api/servers/'+s.id+'/settings', {settings:{'white-list': next ? 'true':'false'}});
+    const value = next ? 'true' : 'false';
+    await API.post('/api/servers/'+s.id+'/settings', {settings:{'white-list': value}});
     toast('Whitelist ' + (next ? 'activée' : 'désactivée'), 'ok', 2400);
-    if (settingsForm) { const r = await API.get('/api/servers/'+s.id+'/settings'); settingsForm = buildPropsForm($('sPropForm'), r.schema, r.settings); }
+    if (settingsForm) settingsForm.setSaved('white-list', value);
+  } catch(e){ sw.setAttribute('aria-checked', String(!next)); toast(e.message,'err'); }
+};
+$('sCrackToggle').onclick = async () => {
+  const s = cur(); if (!s) return;
+  const sw = $('sCrackToggle');
+  const next = sw.getAttribute('aria-checked') !== 'true';  // true = accepter les comptes crack
+  sw.setAttribute('aria-checked', String(next));
+  try {
+    const value = next ? 'false' : 'true';  // valeur de online-mode
+    await API.post('/api/servers/'+s.id+'/settings', {settings:{'online-mode': value}});
+    if (settingsForm) settingsForm.setSaved('online-mode', value);
+    toast((next ? 'Comptes crack acceptés' : 'Comptes crack refusés') +
+          (s.state === 'running' ? ' — pris en compte au prochain reset ou redémarrage' : ''), 'ok', 4500);
+    loadPlayers(s.id);
   } catch(e){ sw.setAttribute('aria-checked', String(!next)); toast(e.message,'err'); }
 };
 
@@ -1230,13 +1334,14 @@ $('btnSaveSet').onclick = async () => {
       seed_mode: $('sSeedMode').value, seed: $('sSeed').value.trim(),
       settings,
     });
-    const n = Object.keys(settings).length;
+    // Le backend dit ce qui a été refusé et ce qui n'a pas pu s'appliquer à chaud
+    // (avant : S.schema, null tant que la fenêtre de création n'avait jamais été ouverte).
+    const rejected = r.rejected || [], later = r.restart_needed || [];
+    const n = Object.keys(settings).length - rejected.length;
     closeModal('scrimSet');
-    toast(n ? n + ' réglage(s) enregistré(s)' : 'Réglages enregistrés', 'ok');
-    if (s.state === 'running'){
-      const restart = Object.keys(settings).filter(k => (S.schema.fields.find(f=>f.key===k)||{}).restart);
-      if (restart.length) toast('Redémarrage nécessaire pour : ' + restart.join(', '), 'err', 8000);
-    }
+    toast(n > 0 ? n + ' réglage(s) enregistré(s)' : 'Réglages enregistrés', 'ok');
+    if (rejected.length) toast('Valeur refusée pour : ' + rejected.join(', '), 'err', 8000);
+    if (later.length) toast('Pris en compte au prochain reset ou redémarrage : ' + later.join(', '), '', 8000);
     refresh();
   } catch(e){ toast(e.message, 'err'); }
 };
@@ -1259,7 +1364,8 @@ $('btnDelete').onclick = async () => {
 document.addEventListener('keydown', (e) => {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
   if (e.key === 'Escape') document.querySelectorAll('.scrim.on').forEach(s=>s.classList.remove('on'));
-  if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
+  // e.repeat : touche R maintenue = rafale de resets.
+  if (typing || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
   const k = e.key.toLowerCase();
   if (k === 'r'){ e.preventDefault(); if(!$('actReset').disabled) act('reset', $('actReset')); }
   else if (k === 's'){ e.preventDefault(); if(!$('actStart').disabled) act('start', $('actStart')); }
@@ -1293,7 +1399,7 @@ setInterval(() => {
 async function loadPublicIp(){
   try { const r = await API.get('/api/ip'); S.publicIp = r.public; }
   catch(e){ S.publicIp = null; }
-  $('chipPub').innerHTML = '🌐 <b>' + (S.publicIp || 'hors ligne') + '</b>';
+  setChip('chipPub', '🌐', S.publicIp || 'hors ligne');
 }
 
 refresh(); connect(); loadPublicIp();
