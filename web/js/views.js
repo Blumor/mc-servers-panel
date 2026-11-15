@@ -30,7 +30,7 @@ function renderNav(){
 }
 
 function renderHome(){
-  const label = (n) => n ? n + ' serveur' + (n > 1 ? 's' : '') : 'Aucun serveur';
+  const label = (n) => n ? plural(n, 'serveur') : 'Aucun serveur';
   const count = (k) => S.servers.filter(s => kindOf(s) === k).length;
   $('countSpeedrun').textContent = label(count('speedrun'));
   $('countSurvival').textContent = label(count('survival'));
@@ -70,7 +70,7 @@ async function loadUsage(id){
 function renderManage(){
   const sig = S.servers.map(s => [s.id, s.name, s.state, s.version, s.port, s.last_backup,
     (S.usage[s.id] || {}).server, (S.usage[s.id] || {}).backups].join(':')).join('|');
-  $('brandsub').textContent = S.servers.length + ' serveur(s)';
+  $('brandsub').textContent = plural(S.servers.length, 'serveur');
   if (sig === manageSig) return;
   manageSig = sig;
   const box = $('manageList'); box.innerHTML = '';
@@ -116,7 +116,7 @@ let survSig = '';
 function renderSurvivalList(){
   const list = S.servers.filter(s => kindOf(s) === 'survival');
   const sig = list.map(s => [s.id, s.name, s.state, s.version, (s.live || {}).player_count].join(':')).join('|');
-  $('brandsub').textContent = list.length + ' serveur(s) de survie';
+  $('brandsub').textContent = plural(list.length, 'serveur', 'serveurs') + ' de survie';
   if (sig === survSig && $('survCards').childElementCount) return;
   survSig = sig;
   const box = $('survCards'); box.innerHTML = '';
@@ -126,7 +126,7 @@ function renderSurvivalList(){
     const head = el('span', 'ticon', '🏡');
     const players = (s.live || {}).player_count || 0;
     card.append(head, el('b', '', s.name),
-      el('span', '', (SOFTWARE_LABEL[s.software] || 'Vanilla') + ' · ' + (s.version === '?' ? 'dernière version' : 'Minecraft ' + s.version) + ' · ' + players + ' joueur(s)'),
+      el('span', '', (SOFTWARE_LABEL[s.software] || 'Vanilla') + ' · ' + (s.version === '?' ? 'dernière version' : 'Minecraft ' + s.version) + ' · ' + plural(players, 'joueur')),
       el('em', '', stateLabel));
     box.append(card);
   });

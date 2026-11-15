@@ -45,8 +45,8 @@ async function loadPlayers(id){
 function drawPlayers(r){
   $('sWlToggle').setAttribute('aria-checked', String(!!r.whitelist_enabled));
   $('sCrackToggle').setAttribute('aria-checked', String(!r.online_mode));
-  $('sWlCount').textContent = r.whitelist.length ? r.whitelist.length + ' joueur(s)' : '';
-  $('sOpCount').textContent = r.ops.length ? r.ops.length + ' joueur(s)' : '';
+  $('sWlCount').textContent = r.whitelist.length ? plural(r.whitelist.length, 'joueur') : '';
+  $('sOpCount').textContent = r.ops.length ? plural(r.ops.length, 'joueur') : '';
   renderPlayerChips($('sWlList'), r.whitelist, n => editPlayer('whitelist','remove',n));
   renderPlayerChips($('sOpList'), r.ops, n => editPlayer('ops','remove',n));
   const note = $('sPlayersNote'); note.innerHTML = '';
@@ -116,7 +116,7 @@ $('btnSaveSet').onclick = async () => {
     const rejected = r.rejected || [], later = r.restart_needed || [];
     const n = Object.keys(settings).length - rejected.length;
     closeModal('scrimSet');
-    toast(n > 0 ? n + ' réglage(s) enregistré(s)' : 'Réglages enregistrés', 'ok');
+    toast(n > 0 ? plural(n, 'réglage enregistré', 'réglages enregistrés') : 'Réglages enregistrés', 'ok');
     if (rejected.length) toast('Valeur refusée pour : ' + rejected.join(', '), 'err', 8000);
     if (later.length) toast('Pris en compte au prochain reset ou redémarrage : ' + later.join(', '), '', 8000);
     refresh();
@@ -150,7 +150,7 @@ async function loadBackups(id){
 }
 function drawBackups(id, list){
   const box = $('sBackupList'); box.innerHTML = '';
-  $('sBackupCount').textContent = list.length ? list.length + ' sauvegarde(s)' : '';
+  $('sBackupCount').textContent = list.length ? plural(list.length, 'sauvegarde') : '';
   if (!list.length){ box.append(el('div','muted','Aucune sauvegarde pour l’instant.')); return; }
   list.forEach(b => {
     const row = el('div','brow');

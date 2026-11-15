@@ -108,7 +108,7 @@ async function loadInstalled(s){
   let r;
   try { r = await API.get('/api/servers/' + s.id + '/content'); } catch(e){ toast(e.message, 'err'); return; }
   const items = r.items.filter(i => CP.ctype === 'mod' ? (i.type === 'mod') : i.type === CP.ctype);
-  CP.box.querySelector('.sectitle .n').textContent = items.length ? items.length + ' installé(s)' : '';
+  CP.box.querySelector('.sectitle .n').textContent = items.length ? plural(items.length, 'installé') : '';
   rows.innerHTML = '';
   if (!items.length){ rows.append(el('div', 'muted', 'Rien d’installé pour l’instant.')); return; }
   items.forEach(i => {
@@ -154,7 +154,7 @@ async function checkUpdates(s){
   try {
     const r = await API.get('/api/servers/' + s.id + '/content/updates');
     CP.updates = Object.fromEntries(r.updates.map(u => [u.project_id, u.latest]));
-    toast(r.updates.length ? r.updates.length + ' mise(s) à jour disponible(s)' : 'Tout est à jour', 'ok');
+    toast(r.updates.length ? plural(r.updates.length, 'mise à jour disponible', 'mises à jour disponibles') : 'Tout est à jour', 'ok');
     loadInstalled(s);
   } catch(e){ toast(e.message, 'err'); }
 }

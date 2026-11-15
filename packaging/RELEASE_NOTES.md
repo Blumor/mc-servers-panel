@@ -1,5 +1,6 @@
 ## Nouveautés
 
+- **Textes plus propres** : « 1 serveur », « 2 serveurs », « 3 joueurs »… au lieu de « serveur(s) ».
 - **Nouvelle icône** pour l'exe (Explorateur, barre des tâches, raccourcis) et pour l'onglet du navigateur.
 - **Nouveau nom : MC Servers Panel** (avant : MC Speedrun Panel). Le panel ne sert plus seulement au speedrun : l'exe s'appelle maintenant `MCServersPanel.exe`.
 - **Panel Aventure & mini-jeux** :

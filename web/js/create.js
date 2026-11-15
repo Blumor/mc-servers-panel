@@ -53,8 +53,8 @@ async function openCreate(kind){
   } catch(e){ toast('Schéma des propriétés indisponible : '+e.message, 'err'); }
 }
 function drawNewPlayers(){
-  $('fWlCount').textContent = S.newWhitelist.length ? S.newWhitelist.length + ' joueur(s)' : '';
-  $('fOpCount').textContent = S.newOps.length ? S.newOps.length + ' joueur(s)' : '';
+  $('fWlCount').textContent = S.newWhitelist.length ? plural(S.newWhitelist.length, 'joueur') : '';
+  $('fOpCount').textContent = S.newOps.length ? plural(S.newOps.length, 'joueur') : '';
   renderPlayerChips($('fWlList'), S.newWhitelist, n => { S.newWhitelist = S.newWhitelist.filter(x=>x!==n); drawNewPlayers(); });
   renderPlayerChips($('fOpList'), S.newOps, n => { S.newOps = S.newOps.filter(x=>x!==n); drawNewPlayers(); });
 }

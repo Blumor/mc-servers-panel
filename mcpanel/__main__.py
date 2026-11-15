@@ -64,7 +64,8 @@ def main(argv=None) -> int:
     print("  Panel      : %s" % url)
     if args.lan:
         print("  Sur le LAN : http://%s:%d/  (ouvert, sans mot de passe)" % (local_ip(), port))
-    print("  Serveurs   : %d configuré(s)" % len(manager().servers))
+    count = len(manager().servers)
+    print("  Serveurs   : %d configuré%s" % (count, "s" if count >= 2 else ""))
     print("  Données    : %s" % cfg.ROOT)
     print("  Arrêt      : Ctrl+C ou fermer cette fenêtre\n")
 

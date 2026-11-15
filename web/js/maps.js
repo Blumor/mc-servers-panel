@@ -15,7 +15,7 @@ let advSig = '';
 function renderAdventureList(){
   const list = S.servers.filter(s => kindOf(s) === 'adventure');
   const sig = list.map(s => [s.id, s.name, s.state, s.version, (s.map || {}).title, (s.live || {}).player_count, MAPS.busy[s.id]].join(':')).join('|');
-  $('brandsub').textContent = list.length ? list.length + ' serveur(s) aventure' : 'choisis une map';
+  $('brandsub').textContent = list.length ? plural(list.length, 'serveur aventure', 'serveurs aventure') : 'choisis une map';
   if (!$('advCatalog').childElementCount) fillCatalog($('advCatalog'), $('advSites'), (m) => playMap({id: m.id, title: m.title}), 'Jouer');
   if (!$('advImport').childElementCount) $('advImport').append(importBox((source) => playMap(source)));
   if (sig === advSig) return;
@@ -28,7 +28,7 @@ function renderAdventureList(){
     const m = s.map || {};
     card.append(el('span', 'ticon', MAP_ICON[m.category] || '🗺️'), el('b', '', s.name),
       el('span', '', (m.title ? m.title : 'Monde sans map') + ' · ' + (s.version === '?' ? 'dernière version' : 'Minecraft ' + s.version) +
-                     ' · ' + ((s.live || {}).player_count || 0) + ' joueur(s)'),
+                     ' · ' + plural((s.live || {}).player_count || 0, 'joueur')),
       el('em', '', MAPS.busy[s.id] ? 'Installation…' : stateLabel));
     box.append(card);
   });

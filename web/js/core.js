@@ -33,6 +33,8 @@ const VIEW_KIND = {speedrun: 'speedrun', survival: 'survival', adventure: 'adven
 const viewKind = () => S.view === 'server' ? (cur() ? kindOf(cur()) : null) : (VIEW_KIND[S.view] || null);
 const kindOf = (s) => s.kind || 'speedrun';
 const viewServers = () => { const k = viewKind(); return k ? S.servers.filter(s => kindOf(s) === k) : S.servers; };
+/* « 0 serveur », « 1 serveur », « 2 serveurs » : en français, 0 et 1 restent au singulier. */
+function plural(n, one, many){ return n + ' ' + (n >= 2 ? (many || one + 's') : one); }
 function fmtBytes(n){
   if (n == null) return '…';
   const u = ['o','Ko','Mo','Go','To']; let i = 0;
