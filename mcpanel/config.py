@@ -43,6 +43,7 @@ RUNTIME_DIR = ROOT / ".runtime"
 TRASH_DIR = ROOT / ".trash"
 LOG_DIR = ROOT / ".logs"
 PANEL_CONF = ROOT / "panel.json"
+BACKUPS_DIR = ROOT / "backups"
 
 VERSION_MANIFEST = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 ADOPTIUM_API = "https://api.adoptium.net/v3/binary/latest"
@@ -101,7 +102,7 @@ def tune_listen_socket(sock: socket.socket) -> None:
 
 
 def ensure_dirs() -> None:
-    for d in (WEB_DIR, SERVERS_DIR, CACHE_DIR, JAR_CACHE, RUNTIME_DIR, TRASH_DIR, LOG_DIR):
+    for d in (WEB_DIR, SERVERS_DIR, CACHE_DIR, JAR_CACHE, RUNTIME_DIR, TRASH_DIR, LOG_DIR, BACKUPS_DIR):
         d.mkdir(parents=True, exist_ok=True)
 
 

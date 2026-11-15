@@ -169,6 +169,23 @@ SPEEDRUN_DEFAULTS = {
     "white-list": "false",
 }
 
+# Survie entre potes : monde gardé des mois. Pas de hardcore, difficulté normale, et
+# écritures synchrones : plus lent, mais un monde qui survit à une coupure de courant.
+SURVIVAL_DEFAULTS = {
+    **SPEEDRUN_DEFAULTS,
+    "difficulty": "normal",
+    "hardcore": "false",
+    "max-players": "10",
+    "motd": "\\u00a7aSurvie \\u00a78| \\u00a7fentre potes",
+    "sync-chunk-writes": "true",
+}
+KIND_DEFAULTS = {"speedrun": SPEEDRUN_DEFAULTS, "survival": SURVIVAL_DEFAULTS}
+
+
+def defaults_for(kind: str | None) -> dict:
+    return KIND_DEFAULTS.get(kind or "speedrun", SPEEDRUN_DEFAULTS)
+
+
 # Modifications qui ne prennent effet qu'au redémarrage du serveur.
 NEEDS_RESTART = frozenset({
     "server-port", "server-ip", "level-name", "level-type", "level-seed", "generator-settings",
@@ -255,6 +272,19 @@ def sanitize(values: dict, allow_locked: bool = False) -> tuple[dict, list[str]]
     return clean, rejected
 
 
+_UNICODE_ESCAPE = re.compile(r"\\u([0-9a-fA-F]{4})")
+
+
+def _decode(value: str) -> str:
+    r"""\u00a7 -> §. Java lit server.properties en Latin-1 et l'écrit avec ces échappements."""
+    return _UNICODE_ESCAPE.sub(lambda m: chr(int(m.group(1), 16)), value)
+
+
+def _encode(value: str) -> str:
+    r"""Inverse : tout caractère hors ASCII est écrit \uXXXX, lisible par toutes les versions."""
+    return "".join(c if 32 <= ord(c) < 127 else "\\u%04x" % ord(c) for c in value)
+
+
 def read(path: Path) -> dict[str, str]:
     data: dict[str, str] = {}
     if not path.exists():
@@ -268,7 +298,7 @@ def read(path: Path) -> dict[str, str]:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, value = line.partition("=")
-        data[key.strip()] = value.strip()
+        data[key.strip()] = _decode(value.strip())
     return data
 
 
@@ -277,14 +307,15 @@ def write(path: Path, values: dict[str, str]) -> None:
     current = read(path)
     current.update({k: str(v) for k, v in values.items()})
     lines = ["#Minecraft server properties", "#Genere par MC Speedrun Panel"]
-    lines += ["%s=%s" % (k, current[k]) for k in sorted(current)]
+    lines += ["%s=%s" % (k, _encode(current[k])) for k in sorted(current)]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def bootstrap(path: Path, port: int, overrides: dict | None = None) -> dict[str, str]:
+def bootstrap(path: Path, port: int, overrides: dict | None = None,
+              defaults: dict | None = None) -> dict[str, str]:
     """Crée server.properties s'il manque ; ne remplace jamais les choix de l'utilisateur."""
-    values = dict(SPEEDRUN_DEFAULTS)
+    values = dict(defaults or SPEEDRUN_DEFAULTS)
     values["server-port"] = str(port)
     values["query.port"] = str(port)
     if overrides:

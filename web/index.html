@@ -3,384 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>MC Speedrun Panel</title>
+<title>MC Panel</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛏️</text></svg>" />
-<style>
-/* ============================ TOKENS ============================ */
-:root{
-  --bg:#05060f;
-  --bg2:#0a0c1c;
-  --glass:rgba(255,255,255,.045);
-  --glass-2:rgba(255,255,255,.07);
-  --stroke:rgba(255,255,255,.09);
-  --stroke-2:rgba(255,255,255,.16);
-  --txt:#eef1ff;
-  --dim:#9aa3c7;
-  --dim-2:#69719a;
-  --cyan:#22d3ee;
-  --violet:#a855f7;
-  --lime:#a3e635;
-  --amber:#fbbf24;
-  --rose:#fb3b6c;
-  --blue:#5b8cff;
-  --r-lg:26px; --r-md:18px; --r-sm:12px;
-  --shadow:0 30px 80px -20px rgba(0,0,0,.85);
-  --ease:cubic-bezier(.22,1,.36,1);
-  --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif;
-  --mono:'JetBrains Mono','SF Mono',ui-monospace,'Cascadia Code',Consolas,monospace;
-}
-*,*::before,*::after{box-sizing:border-box}
-html,body{height:100%}
-body{
-  margin:0;font-family:var(--font);background:var(--bg);color:var(--txt);
-  overflow-x:hidden;-webkit-font-smoothing:antialiased;letter-spacing:-.011em;
-}
-button,input,select,textarea{font:inherit;color:inherit}
-::selection{background:rgba(34,211,238,.3)}
-::-webkit-scrollbar{width:10px;height:10px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:rgba(255,255,255,.11);border-radius:99px;border:3px solid transparent;background-clip:content-box}
-::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.2);background-clip:content-box}
-
-/* ============================ BACKDROP ============================ */
-.backdrop{position:fixed;inset:0;z-index:-2;overflow:hidden;background:
-  radial-gradient(1200px 800px at 15% -10%,#141a3d 0%,transparent 60%),
-  radial-gradient(1000px 700px at 90% 5%,#2a1348 0%,transparent 55%),
-  linear-gradient(180deg,#05060f 0%,#070818 50%,#04050c 100%);}
-.blob{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;mix-blend-mode:screen;will-change:transform}
-.blob.a{width:44vw;height:44vw;background:radial-gradient(circle,#1b8fff,transparent 68%);top:-14vw;left:-8vw;animation:drift1 26s var(--ease) infinite alternate}
-.blob.b{width:38vw;height:38vw;background:radial-gradient(circle,#a855f7,transparent 68%);top:8vw;right:-10vw;animation:drift2 31s var(--ease) infinite alternate}
-.blob.c{width:34vw;height:34vw;background:radial-gradient(circle,#22d3ee,transparent 70%);bottom:-16vw;left:28vw;animation:drift3 37s var(--ease) infinite alternate}
-@keyframes drift1{to{transform:translate3d(12vw,10vh,0) scale(1.25)}}
-@keyframes drift2{to{transform:translate3d(-14vw,14vh,0) scale(.85)}}
-@keyframes drift3{to{transform:translate3d(10vw,-12vh,0) scale(1.2)}}
-.grid-lines{position:fixed;inset:0;z-index:-1;pointer-events:none;
-  background-image:linear-gradient(rgba(255,255,255,.028) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.028) 1px,transparent 1px);
-  background-size:64px 64px;mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,#000 30%,transparent 78%)}
-.noise{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.4;mix-blend-mode:overlay;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E")}
-@media (prefers-reduced-motion:reduce){.blob{animation:none!important}*{animation-duration:.01ms!important;transition-duration:.06s!important}}
-
-/* ============================ LAYOUT ============================ */
-.shell{max-width:1400px;margin:0 auto;padding:22px clamp(14px,3vw,34px) 90px;position:relative}
-header.top{display:flex;align-items:center;gap:16px;padding:12px 0 24px;flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:13px;margin-right:auto}
-.logo{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;font-size:23px;position:relative;
-  background:linear-gradient(145deg,rgba(34,211,238,.22),rgba(168,85,247,.22));border:1px solid var(--stroke-2);
-  box-shadow:0 0 34px rgba(34,211,238,.28),inset 0 1px 0 rgba(255,255,255,.16)}
-.logo::after{content:'';position:absolute;inset:-1px;border-radius:inherit;padding:1px;
-  background:conic-gradient(from 0deg,transparent,var(--cyan),transparent 40%,var(--violet),transparent 75%);
-  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
-  animation:spin 5s linear infinite;opacity:.85}
-@keyframes spin{to{transform:rotate(360deg)}}
-.brand h1{margin:0;font-size:19px;font-weight:750;letter-spacing:-.03em;line-height:1.15}
-.brand small{display:block;font-size:11.5px;color:var(--dim-2);font-weight:500;letter-spacing:.06em;text-transform:uppercase}
-.pillbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
-.chip{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;border-radius:99px;
-  background:var(--glass);border:1px solid var(--stroke);font-size:12.5px;font-weight:600;color:var(--dim);
-  backdrop-filter:blur(14px);transition:.25s var(--ease);white-space:nowrap}
-.chip:hover{border-color:var(--stroke-2);color:var(--txt)}
-.chip b{color:var(--txt);font-weight:700}
-.chip.click{cursor:pointer}
-.chip.click:active{transform:scale(.95)}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--dim-2);flex:none;transition:.3s}
-.dot.on{background:var(--lime);box-shadow:0 0 0 0 rgba(163,230,53,.6);animation:pulse 2s infinite}
-.dot.warn{background:var(--amber)}
-.dot.off{background:var(--rose)}
-@keyframes pulse{70%{box-shadow:0 0 0 9px rgba(163,230,53,0)}100%{box-shadow:0 0 0 0 rgba(163,230,53,0)}}
-
-/* ============================ CARDS ============================ */
-.card{position:relative;background:linear-gradient(160deg,rgba(255,255,255,.062),rgba(255,255,255,.022));
-  border:1px solid var(--stroke);border-radius:var(--r-lg);backdrop-filter:blur(26px) saturate(150%);
-  box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.07);overflow:hidden}
-.card::before{content:'';position:absolute;top:0;left:12%;right:12%;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);opacity:.6}
-.card-h{display:flex;align-items:center;gap:10px;padding:17px 21px 0}
-.card-h h3{margin:0;font-size:12px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--dim-2)}
-.card-b{padding:16px 21px 20px}
-
-/* ============================ HERO / STATUS ============================ */
-.hero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px;margin-bottom:18px}
-@media(max-width:980px){.hero{grid-template-columns:1fr}}
-
-.statebar{display:flex;align-items:center;gap:14px;padding:20px 22px;flex-wrap:wrap}
-.state-pill{display:inline-flex;align-items:center;gap:9px;height:38px;padding:0 17px;border-radius:99px;
-  font-size:13px;font-weight:750;letter-spacing:.02em;border:1px solid;transition:.35s var(--ease)}
-.st-stopped{background:rgba(105,113,154,.13);border-color:rgba(105,113,154,.3);color:#a9b0d4}
-.st-starting,.st-resetting,.st-installing,.st-stopping{background:rgba(251,191,36,.13);border-color:rgba(251,191,36,.35);color:var(--amber)}
-.st-running{background:rgba(163,230,53,.12);border-color:rgba(163,230,53,.36);color:var(--lime);
-  box-shadow:0 0 30px -6px rgba(163,230,53,.5)}
-.st-error{background:rgba(251,59,108,.14);border-color:rgba(251,59,108,.4);color:var(--rose)}
-
-.timer{font-family:var(--mono);font-size:clamp(46px,7vw,78px);font-weight:700;line-height:.95;letter-spacing:-.045em;
-  background:linear-gradient(175deg,#fff 8%,#93a4e8 55%,#5b6bb5 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
-  font-variant-numeric:tabular-nums;filter:drop-shadow(0 4px 26px rgba(91,140,255,.32))}
-/* le raccourci `background` remet background-clip a border-box: on le redeclare */
-.timer.live{background:linear-gradient(175deg,#fff 5%,#b6f36a 60%,#57a814 100%);
-  -webkit-background-clip:text;background-clip:text;color:transparent;
-  filter:drop-shadow(0 4px 30px rgba(163,230,53,.36))}
-.timer-lab{font-size:11px;letter-spacing:.19em;text-transform:uppercase;color:var(--dim-2);font-weight:800;margin-bottom:4px}
-
-.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:10px;margin-top:18px}
-.metric{background:rgba(255,255,255,.032);border:1px solid var(--stroke);border-radius:var(--r-sm);padding:11px 13px;transition:.25s var(--ease)}
-.metric:hover{background:rgba(255,255,255,.06);transform:translateY(-2px)}
-.metric .k{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim-2);font-weight:800}
-.metric .v{font-size:19px;font-weight:750;margin-top:3px;font-variant-numeric:tabular-nums;font-family:var(--mono);letter-spacing:-.03em}
-.metric .v.small{font-size:14px}
-
-/* ============================ BUTTONS ============================ */
-.btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:9px;
-  border:1px solid var(--stroke-2);background:var(--glass-2);border-radius:14px;padding:0 18px;height:44px;
-  font-size:14px;font-weight:700;cursor:pointer;transition:.22s var(--ease);overflow:hidden;
-  backdrop-filter:blur(10px);white-space:nowrap;-webkit-tap-highlight-color:transparent}
-.btn:hover:not(:disabled){transform:translateY(-2px);border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.11)}
-.btn:active:not(:disabled){transform:translateY(0) scale(.975)}
-.btn:disabled{opacity:.34;cursor:not-allowed}
-.btn.sm{height:36px;padding:0 13px;font-size:12.5px;border-radius:11px}
-.btn.icon{width:44px;padding:0}
-.btn.icon.sm{width:36px}
-.btn.ghost{background:transparent;border-color:var(--stroke)}
-.btn.danger{border-color:rgba(251,59,108,.34);color:#ffbdcd;background:rgba(251,59,108,.1)}
-.btn.danger:hover:not(:disabled){background:rgba(251,59,108,.2);border-color:rgba(251,59,108,.6)}
-.btn .kbd{margin-left:2px;font-family:var(--mono);font-size:10px;opacity:.55;border:1px solid currentColor;
-  border-radius:5px;padding:1px 4px;line-height:1.2;font-weight:700}
-.btn::after{content:'';position:absolute;inset:0;background:radial-gradient(240px circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.16),transparent 42%);
-  opacity:0;transition:opacity .3s}
-.btn:hover::after{opacity:1}
-
-/* action grid: the speedrun cockpit */
-.actions{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:12px}
-@media(max-width:620px){.actions{grid-template-columns:1fr 1fr}.act.reset{grid-column:1/-1}}
-.act{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
-  min-height:104px;border-radius:20px;border:1px solid var(--stroke-2);cursor:pointer;overflow:hidden;
-  background:linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.022));
-  transition:.26s var(--ease);-webkit-tap-highlight-color:transparent}
-.act:hover:not(:disabled){transform:translateY(-3px);box-shadow:0 22px 46px -18px rgba(0,0,0,.9)}
-.act:active:not(:disabled){transform:translateY(-1px) scale(.985)}
-.act:disabled{opacity:.3;cursor:not-allowed;filter:grayscale(.6)}
-.act .ico{font-size:26px;line-height:1}
-.act .lab{font-size:15px;font-weight:800;letter-spacing:-.015em}
-.act .sub{font-size:10.5px;color:var(--dim-2);font-weight:600;letter-spacing:.05em;text-transform:uppercase}
-.act .key{position:absolute;top:9px;right:11px;font-family:var(--mono);font-size:10px;font-weight:800;
-  color:var(--dim-2);border:1px solid var(--stroke);border-radius:6px;padding:2px 6px;background:rgba(0,0,0,.28)}
-.act.reset{background:linear-gradient(150deg,rgba(168,85,247,.28),rgba(91,140,255,.16) 55%,rgba(34,211,238,.2));
-  border-color:rgba(168,85,247,.42);box-shadow:0 0 44px -12px rgba(168,85,247,.6)}
-.act.reset::before{content:'';position:absolute;inset:-2px;border-radius:inherit;padding:2px;
-  background:conic-gradient(from var(--ang,0deg),transparent 0%,var(--violet) 12%,var(--cyan) 28%,transparent 44%);
-  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
-  animation:rot 3.2s linear infinite}
-@property --ang{syntax:'<angle>';initial-value:0deg;inherits:false}
-@keyframes rot{to{--ang:360deg}}
-.act.reset:disabled::before{animation-play-state:paused;opacity:.25}
-.act.start{background:linear-gradient(150deg,rgba(163,230,53,.24),rgba(34,211,238,.12));border-color:rgba(163,230,53,.4)}
-.act.stop{background:linear-gradient(150deg,rgba(251,59,108,.2),rgba(168,85,247,.08));border-color:rgba(251,59,108,.35)}
-.act .flash{position:absolute;inset:0;background:radial-gradient(circle at center,rgba(255,255,255,.5),transparent 62%);
-  opacity:0;pointer-events:none}
-.act.fired .flash{animation:flash .5s var(--ease)}
-@keyframes flash{0%{opacity:.9;transform:scale(.4)}100%{opacity:0;transform:scale(1.7)}}
-
-/* ============================ TURBO ============================ */
-.turbo-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.switch{position:relative;width:58px;height:32px;border-radius:99px;border:1px solid var(--stroke-2);
-  background:rgba(0,0,0,.35);cursor:pointer;transition:.3s var(--ease);flex:none;padding:0}
-.switch i{position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#7a83ad;transition:.34s var(--ease)}
-.switch[aria-checked="true"]{background:linear-gradient(90deg,rgba(168,85,247,.5),rgba(34,211,238,.5));border-color:rgba(34,211,238,.6);
-  box-shadow:0 0 26px -4px rgba(34,211,238,.65)}
-.switch[aria-checked="true"] i{left:29px;background:#fff;box-shadow:0 0 14px rgba(255,255,255,.85)}
-.warm{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;padding:7px 13px;border-radius:99px;
-  border:1px dashed var(--stroke-2);color:var(--dim)}
-.warm.ready{border-style:solid;border-color:rgba(163,230,53,.5);color:var(--lime);background:rgba(163,230,53,.09);
-  box-shadow:0 0 24px -8px rgba(163,230,53,.8)}
-.warm.booting{border-color:rgba(251,191,36,.45);color:var(--amber)}
-.spinner{width:12px;height:12px;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;animation:spin .8s linear infinite;flex:none}
-
-/* ============================ PLAYERS ============================ */
-.players{display:flex;gap:8px;flex-wrap:wrap;min-height:34px;align-items:center}
-.pl{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 12px 0 5px;border-radius:99px;
-  background:rgba(255,255,255,.06);border:1px solid var(--stroke);font-size:12.5px;font-weight:700;
-  animation:popin .4s var(--ease)}
-.pl img{width:24px;height:24px;border-radius:50%;image-rendering:pixelated;background:#222}
-@keyframes popin{from{opacity:0;transform:scale(.7) translateY(6px)}to{opacity:1;transform:none}}
-.muted{color:var(--dim-2);font-size:12.5px;font-weight:600}
-
-/* ============================ CONSOLE ============================ */
-.console-wrap{margin-top:18px}
-.console{font-family:var(--mono);font-size:12.2px;line-height:1.62;height:min(42vh,400px);overflow-y:auto;
-  padding:14px 18px;background:rgba(0,0,0,.42);border-top:1px solid var(--stroke);scroll-behavior:smooth}
-.ln{display:flex;gap:9px;padding:1px 0;white-space:pre-wrap;word-break:break-word;animation:slidein .22s var(--ease)}
-@keyframes slidein{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
-.ln .tm{color:#4b527a;flex:none;font-size:11px;padding-top:1px}
-.ln .tx{flex:1;min-width:0;color:#c3cae8}
-.ln.error .tx{color:#ff90ac}
-.ln.warn .tx{color:#ffcf6b}
-.ln.join .tx{color:#b6f36a;font-weight:600}
-.ln.leave .tx{color:#8f98c0}
-.ln.death .tx{color:#ff9a5b;font-weight:600}
-.ln.cmd .tx{color:var(--cyan);font-weight:700}
-.ln.panel .tx{color:var(--violet);font-weight:600}
-.cmdbar{display:flex;gap:9px;padding:12px 16px;border-top:1px solid var(--stroke);background:rgba(0,0,0,.25)}
-.cmdbar input{flex:1;min-width:0;height:40px;border-radius:11px;border:1px solid var(--stroke);background:rgba(255,255,255,.04);
-  padding:0 14px;font-family:var(--mono);font-size:13px;outline:none;transition:.22s}
-.cmdbar input:focus{border-color:rgba(34,211,238,.55);background:rgba(34,211,238,.06);box-shadow:0 0 0 4px rgba(34,211,238,.1)}
-.quick{display:flex;gap:7px;flex-wrap:wrap;padding:0 16px 12px}
-.qbtn{height:30px;padding:0 11px;border-radius:9px;border:1px solid var(--stroke);background:rgba(255,255,255,.04);
-  font-size:11.5px;font-weight:700;cursor:pointer;font-family:var(--mono);color:var(--dim);transition:.2s var(--ease)}
-.qbtn:hover{color:var(--txt);border-color:var(--stroke-2);background:rgba(255,255,255,.1);transform:translateY(-1px)}
-
-/* ============================ TABS ============================ */
-.tabs{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
-.tab{display:inline-flex;align-items:center;gap:9px;height:42px;padding:0 16px;border-radius:14px;cursor:pointer;
-  border:1px solid var(--stroke);background:var(--glass);font-size:13.5px;font-weight:700;transition:.25s var(--ease);
-  color:var(--dim);backdrop-filter:blur(12px)}
-.tab:hover{color:var(--txt);border-color:var(--stroke-2)}
-.tab.on{color:var(--txt);background:linear-gradient(140deg,rgba(34,211,238,.2),rgba(168,85,247,.16));
-  border-color:rgba(34,211,238,.45);box-shadow:0 0 28px -10px rgba(34,211,238,.8)}
-
-/* ============================ EMPTY / ONBOARD ============================ */
-.empty{text-align:center;padding:clamp(40px,9vw,96px) 24px}
-.empty .big{font-size:clamp(30px,5.4vw,52px);font-weight:820;letter-spacing:-.045em;margin:0 0 12px;
-  background:linear-gradient(170deg,#fff,#8ea0e6);-webkit-background-clip:text;background-clip:text;color:transparent}
-.empty p{color:var(--dim);max-width:520px;margin:0 auto 30px;font-size:15px;line-height:1.6}
-.cta{height:60px;padding:0 34px;font-size:16.5px;border-radius:18px;
-  background:linear-gradient(135deg,rgba(168,85,247,.35),rgba(34,211,238,.3));border-color:rgba(34,211,238,.5);
-  box-shadow:0 0 50px -14px rgba(34,211,238,.9)}
-
-/* ============================ MODAL ============================ */
-.scrim{position:fixed;inset:0;background:rgba(3,4,12,.72);backdrop-filter:blur(9px);z-index:60;
-  display:grid;place-items:center;padding:20px;opacity:0;pointer-events:none;transition:.3s var(--ease)}
-.scrim.on{opacity:1;pointer-events:auto}
-.modal{width:min(620px,100%);max-height:88vh;display:flex;flex-direction:column;
-  transform:translateY(16px) scale(.97);transition:.36s var(--ease)}
-.scrim.on .modal{transform:none}
-/* En-tete et boutons restent visibles, seul le contenu defile. */
-.modal > .card-b{display:flex;flex-direction:column;min-height:0;overflow:hidden}
-.mbody{flex:1;min-height:0;overflow-y:auto;padding-right:4px;margin-right:-4px}
-.mfoot{flex:none;display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;
-  padding-top:16px;margin-top:16px;border-top:1px solid var(--stroke)}
-.modal h2{margin:0 0 4px;font-size:22px;font-weight:800;letter-spacing:-.03em}
-.modal .sub{color:var(--dim);font-size:13.5px;margin-bottom:20px}
-.field{margin-bottom:15px}
-.field label{display:block;font-size:11px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--dim-2);margin-bottom:7px}
-.field input,.field select{width:100%;height:44px;border-radius:12px;border:1px solid var(--stroke);
-  background:rgba(255,255,255,.045);padding:0 14px;outline:none;font-size:14px;transition:.22s}
-.field input:focus,.field select:focus{border-color:rgba(34,211,238,.55);box-shadow:0 0 0 4px rgba(34,211,238,.1)}
-.field select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239aa3c7' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat:no-repeat;background-position:right 15px center}
-.field select option{background:#0b0d1e}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media(max-width:520px){.row2{grid-template-columns:1fr}}
-.hint{font-size:11.5px;color:var(--dim-2);margin-top:6px;line-height:1.5}
-input[type=range]{-webkit-appearance:none;height:6px;border-radius:99px;background:rgba(255,255,255,.12);padding:0;width:100%}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;cursor:pointer;
-  background:linear-gradient(140deg,var(--cyan),var(--violet));box-shadow:0 0 16px rgba(34,211,238,.8)}
-input[type=range]::-moz-range-thumb{width:20px;height:20px;border:0;border-radius:50%;
-  background:linear-gradient(140deg,var(--cyan),var(--violet));box-shadow:0 0 16px rgba(34,211,238,.8);cursor:pointer}
-
-/* ============================ EDITEUR DE PROPRIETES ============================ */
-.modal.wide{width:min(860px,100%)}
-.mtabs{display:flex;gap:6px;margin:0 0 18px;padding:5px;border-radius:14px;background:rgba(0,0,0,.3);border:1px solid var(--stroke)}
-.mtab{flex:1;height:38px;border:0;border-radius:10px;background:transparent;color:var(--dim);font-size:13px;
-  font-weight:700;cursor:pointer;transition:.22s var(--ease);outline:none}
-.mtab:hover{color:var(--txt)}
-.mtab:focus-visible{box-shadow:0 0 0 2px rgba(34,211,238,.6)}
-.mtab.on{color:var(--txt);background:linear-gradient(140deg,rgba(34,211,238,.22),rgba(168,85,247,.18));
-  box-shadow:0 0 20px -8px rgba(34,211,238,.9)}
-.pane{display:none}
-.pane.on{display:block;animation:fadein .28s var(--ease)}
-@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-
-.searchbox{position:relative;margin-bottom:14px}
-.searchbox input{width:100%;height:42px;border-radius:12px;border:1px solid var(--stroke);
-  background:rgba(255,255,255,.045);padding:0 14px 0 38px;outline:none;font-size:13.5px;transition:.22s}
-.searchbox input:focus{border-color:rgba(34,211,238,.55);box-shadow:0 0 0 4px rgba(34,211,238,.1)}
-.searchbox::before{content:'🔎';position:absolute;left:13px;top:11px;font-size:14px;opacity:.6}
-
-.pgroup{margin-bottom:16px;border:1px solid var(--stroke);border-radius:var(--r-md);overflow:hidden;
-  background:rgba(255,255,255,.022)}
-.pgroup > summary{list-style:none;cursor:pointer;padding:13px 16px;font-size:11.5px;font-weight:800;
-  letter-spacing:.13em;text-transform:uppercase;color:var(--dim);display:flex;align-items:center;gap:9px;
-  transition:.2s;user-select:none}
-.pgroup > summary::-webkit-details-marker{display:none}
-.pgroup > summary:hover{color:var(--txt);background:rgba(255,255,255,.04)}
-.pgroup > summary::before{content:'▸';font-size:12px;transition:transform .25s var(--ease);opacity:.7}
-.pgroup[open] > summary::before{transform:rotate(90deg)}
-.pgroup > summary .count{margin-left:auto;font-size:10.5px;opacity:.55;letter-spacing:.04em}
-.pbody{padding:4px 16px 14px;border-top:1px solid var(--stroke)}
-
-.prow{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:14px;align-items:center;
-  padding:10px 0;border-bottom:1px solid rgba(255,255,255,.045)}
-.prow:last-child{border-bottom:0}
-@media(max-width:600px){.prow{grid-template-columns:1fr;gap:7px}}
-.prow .lbl{font-size:13.5px;font-weight:650;line-height:1.35}
-.prow .lbl code{font-family:var(--mono);font-size:10.5px;color:var(--dim-2);display:block;margin-top:2px;font-weight:500}
-.prow .lbl .hint{font-size:11.5px;color:var(--dim-2);font-weight:500;margin-top:4px;line-height:1.45}
-.prow .ctl{display:flex;justify-content:flex-end;align-items:center;gap:8px}
-.prow .ctl input[type=text],.prow .ctl input[type=number],.prow .ctl select{
-  width:100%;height:38px;border-radius:10px;border:1px solid var(--stroke);background:rgba(255,255,255,.045);
-  padding:0 12px;outline:none;font-size:13px;transition:.2s}
-.prow .ctl input:focus,.prow .ctl select:focus{border-color:rgba(34,211,238,.55);box-shadow:0 0 0 3px rgba(34,211,238,.1)}
-.prow .ctl select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239aa3c7' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat:no-repeat;background-position:right 13px center;padding-right:32px}
-.prow .ctl select option{background:#0b0d1e}
-.prow.locked{opacity:.55}
-.prow.locked .ctl input,.prow.locked .ctl select{pointer-events:none}
-.prow .tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
-.tag{font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:5px;
-  border:1px solid;line-height:1.5}
-.tag.lock{color:var(--dim-2);border-color:var(--stroke-2)}
-.tag.rst{color:var(--amber);border-color:rgba(251,191,36,.4);background:rgba(251,191,36,.08)}
-.tag.chg{color:var(--cyan);border-color:rgba(34,211,238,.45);background:rgba(34,211,238,.1)}
-.prow.changed{background:linear-gradient(90deg,rgba(34,211,238,.07),transparent)}
-
-/* joueurs */
-.plist{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 4px;min-height:38px}
-.pchip{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 6px 0 5px;border-radius:99px;
-  background:rgba(255,255,255,.06);border:1px solid var(--stroke);font-size:13px;font-weight:650;
-  animation:popin .35s var(--ease)}
-.pchip img{width:26px;height:26px;border-radius:50%;image-rendering:pixelated;background:#1a1d33}
-.pchip .rm{width:24px;height:24px;border-radius:50%;border:0;background:transparent;color:var(--dim-2);
-  cursor:pointer;font-size:15px;line-height:1;transition:.2s;display:grid;place-items:center}
-.pchip .rm:hover{background:rgba(251,59,108,.25);color:#ffc0d0}
-.addrow{display:flex;gap:9px}
-.addrow input{flex:1;min-width:0;height:42px;border-radius:12px;border:1px solid var(--stroke);
-  background:rgba(255,255,255,.045);padding:0 14px;outline:none;font-size:14px;transition:.22s}
-.addrow input:focus{border-color:rgba(34,211,238,.55);box-shadow:0 0 0 4px rgba(34,211,238,.1)}
-.note{font-size:12px;color:var(--dim);background:rgba(255,255,255,.04);border:1px solid var(--stroke);
-  border-left:3px solid var(--cyan);border-radius:10px;padding:11px 13px;line-height:1.55;margin-top:12px}
-.note.warn{border-left-color:var(--amber)}
-.sectitle{font-size:11px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--dim-2);
-  margin:22px 0 2px;display:flex;align-items:center;gap:9px}
-.sectitle:first-child{margin-top:0}
-.sectitle .n{font-size:10px;opacity:.6;letter-spacing:.04em}
-
-/* ============================ PROGRESS / TOAST ============================ */
-.jobbar{position:fixed;top:0;left:0;right:0;height:3px;z-index:90;background:transparent;pointer-events:none}
-.jobbar i{display:block;height:100%;width:0;border-radius:0 3px 3px 0;transition:width .3s var(--ease);
-  background:linear-gradient(90deg,var(--cyan),var(--violet),var(--lime));box-shadow:0 0 18px rgba(34,211,238,.9)}
-.toasts{position:fixed;bottom:22px;right:22px;z-index:95;display:flex;flex-direction:column;gap:10px;align-items:flex-end;pointer-events:none}
-.toast{display:flex;align-items:center;gap:11px;padding:13px 17px;border-radius:15px;font-size:13.5px;font-weight:650;
-  background:rgba(14,17,36,.93);border:1px solid var(--stroke-2);backdrop-filter:blur(20px);box-shadow:var(--shadow);
-  animation:toastin .42s var(--ease);max-width:min(400px,88vw);pointer-events:auto}
-.toast.out{animation:toastout .3s var(--ease) forwards}
-.toast.ok{border-color:rgba(163,230,53,.45)}
-.toast.err{border-color:rgba(251,59,108,.5)}
-@keyframes toastin{from{opacity:0;transform:translateX(40px) scale(.9)}to{opacity:1;transform:none}}
-@keyframes toastout{to{opacity:0;transform:translateX(40px) scale(.9)}}
-
-/* big center flash on reset */
-.bigflash{position:fixed;inset:0;z-index:80;display:grid;place-items:center;pointer-events:none;opacity:0}
-.bigflash.go{animation:bf 1.15s var(--ease)}
-.bigflash .txt{font-size:clamp(40px,10vw,120px);font-weight:900;letter-spacing:-.06em;
-  background:linear-gradient(170deg,#fff,#a3e635);-webkit-background-clip:text;background-clip:text;color:transparent;
-  text-shadow:0 0 80px rgba(163,230,53,.5)}
-@keyframes bf{0%{opacity:0;transform:scale(.6)}18%{opacity:1;transform:scale(1.04)}72%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.12)}}
-
-.footer{margin-top:26px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:center;
-  font-size:11.5px;color:var(--dim-2);font-weight:600}
-kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--stroke-2);border-radius:5px;padding:2px 6px;
-  background:rgba(255,255,255,.05);color:var(--dim)}
-.hidden{display:none!important}
-</style>
+<link rel="stylesheet" href="app.css" />
 </head>
 <body>
 <div class="backdrop"><div class="blob a"></div><div class="blob b"></div><div class="blob c"></div></div>
@@ -392,8 +17,8 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--stroke-2);bo
 <div class="shell">
   <header class="top">
     <div class="brand">
-      <div class="logo">⛏️</div>
-      <div><h1>Speedrun Panel</h1><small id="brandsub">connexion…</small></div>
+      <a class="logo" href="#/" title="Accueil">⛏️</a>
+      <div><h1 id="brandTitle">MC Panel</h1><small id="brandsub">connexion…</small></div>
     </div>
     <div class="pillbar">
       <div class="chip" id="chipConn"><span class="dot" id="dotConn"></span><span>Hors ligne</span></div>
@@ -405,12 +30,124 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--stroke-2);bo
     </div>
   </header>
 
-  <!-- ONBOARDING -->
+  <nav class="viewnav" id="viewnav">
+    <a href="#/" data-view="home">🏠 Accueil</a>
+    <a href="#/speedrun" data-view="speedrun">💀 Speedrun</a>
+    <a href="#/survie" data-view="survival">🏡 Survie</a>
+    <a href="#/serveurs" data-view="manage">🛠️ Mes serveurs</a>
+  </nav>
+
+  <!-- ACCUEIL -->
+  <section id="home" class="hidden">
+    <div class="homehead">
+      <h2 class="big">On joue à quoi ?</h2>
+      <p>Choisis un type de partie. Java, Minecraft et la config se font tout seuls.</p>
+    </div>
+    <div class="tiles">
+      <a class="tile" href="#/speedrun"><span class="ticon">💀</span><b>Speedrun</b>
+        <span>Mondes jetables en hardcore, reset en un clic (touche R), mode Turbo.</span><em id="countSpeedrun"></em></a>
+      <a class="tile" href="#/survie"><span class="ticon">🏡</span><b>Survie entre potes</b>
+        <span>Un monde qui dure, sauvegardé automatiquement. Plugins et mods arrivent bientôt.</span><em id="countSurvival"></em></a>
+      <div class="tile soon" aria-disabled="true"><span class="ticon">🗺️</span><b>Aventure &amp; mini-jeux</b>
+        <span>Maps aventure et mini-jeux prêts à jouer, à installer en un clic.</span><em>Bientôt</em></div>
+      <a class="tile" href="#/serveurs"><span class="ticon">🛠️</span><b>Mes serveurs</b>
+        <span>Tous tes serveurs : état, place disque, sauvegardes, réglages avancés.</span><em id="countAll"></em></a>
+    </div>
+  </section>
+
+  <!-- MES SERVEURS -->
+  <section id="manage" class="hidden">
+    <div class="card">
+      <div class="card-h"><h3>Mes serveurs</h3>
+        <div style="margin-left:auto;display:flex;gap:7px">
+          <a class="btn sm ghost" href="#/speedrun">＋ Speedrun</a>
+          <a class="btn sm ghost" href="#/survie">＋ Survie</a>
+        </div>
+      </div>
+      <div class="card-b"><div class="mlist" id="manageList"></div></div>
+    </div>
+  </section>
+
+  <!-- SURVIE : LISTE DES SERVEURS -->
+  <section id="survlist" class="hidden">
+    <div class="homehead">
+      <h2 class="big">Survie entre potes</h2>
+      <p>Un monde qui dure, sauvegardé tout seul. Crée un serveur, règle-le, lance-le.</p>
+    </div>
+    <div class="tiles" id="survCards"></div>
+  </section>
+
+  <!-- PAGE D'UN SERVEUR (survie) : catégories à gauche, une page par catégorie -->
+  <section id="srvpage" class="hidden">
+    <div class="card srvhead">
+      <div class="state-pill st-stopped" id="pgState"><span class="dot"></span><span>Arrêté</span></div>
+      <div class="srvtitle"><b id="pgName">—</b><small id="pgMeta">—</small></div>
+      <div class="chip click" id="pgAddr" title="Copier l'adresse">📋 <b>—</b></div>
+      <div class="srvacts">
+        <button class="btn sm" id="pgStart">▶ Démarrer</button>
+        <button class="btn sm danger" id="pgStop">■ Arrêter</button>
+        <button class="btn sm ghost" id="pgBackup">💾 Sauvegarder</button>
+      </div>
+    </div>
+    <div class="srvgrid">
+      <nav class="sidenav" id="pgNav"></nav>
+      <div class="srvbody">
+        <div class="cat card" data-cat="dashboard"><div class="card-b" id="catDashboard"></div></div>
+        <div class="cat card" data-cat="general"><div class="card-b">
+          <h3 class="cattitle">Général</h3>
+          <div class="row2">
+            <div class="field"><label>Nom</label><input id="gName" maxlength="40" /></div>
+            <div class="field"><label>Version Minecraft</label><select id="gVersion"></select></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>Port</label><input id="gPort" type="number" min="1024" max="65535" /></div>
+            <div class="field"><label>RAM — <span id="gRamLab">—</span></label><input id="gRam" type="range" min="1024" max="16384" step="512" /></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>Difficulté</label><select id="gDiff">
+              <option value="peaceful">Peaceful</option><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></div>
+            <div class="field"><label>Mode de jeu</label><select id="gMode">
+              <option value="survival">Survie</option><option value="creative">Créatif</option><option value="adventure">Aventure</option><option value="spectator">Spectateur</option></select></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>Joueurs max</label><input id="gMax" type="number" min="1" max="200" /></div>
+            <div class="field"><label>Sauvegarde automatique</label><select id="gBackup">
+              <option value="0">Désactivée</option><option value="1">Toutes les heures</option><option value="3">Toutes les 3 h</option>
+              <option value="6">Toutes les 6 h</option><option value="24">Une fois par jour</option></select></div>
+          </div>
+          <div class="field"><label>Message du serveur (MOTD)</label><input id="gMotd" maxlength="120" /></div>
+          <div class="row2">
+            <div class="field"><label>Graine du monde</label><input id="gSeed" placeholder="vide = aléatoire" />
+              <div class="hint">Utilisée seulement à la création du monde.</div></div>
+            <div class="field"><label>&nbsp;</label>
+              <div class="turbo-row"><button class="switch" id="gHardcore" role="switch" aria-checked="false"><i></i></button><span>Hardcore</span></div>
+              <div class="turbo-row" style="margin-top:8px"><button class="switch" id="gPvp" role="switch" aria-checked="true"><i></i></button><span>PvP</span></div>
+            </div>
+          </div>
+          <div class="turbo-row" style="margin:4px 0 6px"><button class="switch" id="gCrack" role="switch" aria-checked="false"><i></i></button>
+            <div><b>Accepter les comptes crack</b><div class="hint">Plus aucune vérification Mojang : n'importe qui peut prendre n'importe quel pseudo, y compris celui d'un OP.</div></div></div>
+          <div class="pagefoot"><button class="btn" id="gSave">Enregistrer</button></div>
+          <h3 class="cattitle danger-title">Zone sensible</h3>
+          <div class="pagefoot left">
+            <button class="btn sm ghost" id="gClean">🧹 Effacer le monde (sauvegardé avant)</button>
+            <button class="btn sm danger" id="gDelete">🗑 Supprimer le serveur</button>
+          </div>
+        </div></div>
+        <div class="cat card" data-cat="players"><div class="card-b" id="catPlayers"><h3 class="cattitle">Joueurs</h3></div></div>
+        <div class="cat card" data-cat="backups"><div class="card-b" id="catBackups"><h3 class="cattitle">Sauvegardes</h3></div></div>
+        <div class="cat card" data-cat="advanced"><div class="card-b" id="catAdvanced"><h3 class="cattitle">Avancé — server.properties</h3>
+          <div class="hint" style="margin:-6px 0 14px">Tous les réglages Minecraft. Pris en compte au prochain démarrage.</div>
+          <div id="advSlot"></div>
+          <div class="pagefoot"><button class="btn" id="advSave">Enregistrer</button></div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AUCUN SERVEUR DANS CE PANEL -->
   <section id="empty" class="card hidden">
     <div class="empty">
-      <h2 class="big">Aucun serveur.<br>On en crée un ?</h2>
-      <p>Le panel télécharge Java et Minecraft tout seul, écrit la config, et te donne trois boutons.
-         Reste plus qu'à mourir bêtement dans un ravin.</p>
+      <h2 class="big" id="emptyTitle">Aucun serveur.<br>On en crée un ?</h2>
+      <p id="emptyText">Le panel télécharge Java et Minecraft tout seul, écrit la config, et te donne trois boutons.</p>
       <button class="btn cta" id="btnCreateFirst">🚀 Créer mon serveur</button>
     </div>
   </section>
@@ -427,10 +164,13 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--stroke-2);bo
           <div class="chip click" id="chipAddr" title="Copier">📋 <b>—</b></div>
           <div class="chip" id="chipVer">📦 <b>—</b></div>
           <div class="chip hidden" id="chipFlags"></div>
+          <div class="chip hidden" id="chipBackup">💾 <b>—</b></div>
           <div style="margin-left:auto" class="chip" id="chipResets">🔁 <b>0</b> resets</div>
         </div>
         <div class="card-b" style="padding-top:4px">
           <div class="actions">
+            <button class="act backup hidden" id="actBackup"><span class="key">B</span><span class="flash"></span>
+              <span class="ico">💾</span><span class="lab">SAUVEGARDE</span><span class="sub">monde actuel</span></button>
             <button class="act reset" id="actReset"><span class="key">R</span><span class="flash"></span>
               <span class="ico">💀</span><span class="lab">RESET</span><span class="sub" id="resetSub">monde neuf</span></button>
             <button class="act start" id="actStart"><span class="key">S</span><span class="flash"></span>
@@ -438,7 +178,7 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--stroke-2);bo
             <button class="act stop" id="actStop"><span class="key">X</span><span class="flash"></span>
               <span class="ico">■</span><span class="lab">STOP</span><span class="sub">arrêter</span></button>
           </div>
-          <div class="turbo-row" style="margin-top:16px">
+          <div class="turbo-row" style="margin-top:16px" id="turboRow">
             <button class="switch" id="swTurbo" role="switch" aria-checked="false"><i></i></button>
             <div style="flex:1;min-width:180px">
               <div style="font-size:13.5px;font-weight:750">Mode Turbo</div>
@@ -453,11 +193,11 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--stroke-2);bo
       <!-- RIGHT: run stats -->
       <div class="card">
         <div class="card-b">
-          <div class="timer-lab">Temps de run</div>
+          <div class="timer-lab" id="timerLab">Temps de run</div>
           <div class="timer" id="timer">--:--</div>
           <div class="metrics">
             <div class="metric"><div class="k">Joueurs</div><div class="v" id="mPlayers">0</div></div>
-            <div class="metric"><div class="k">Dernier reset</div><div class="v" id="mReset">—</div></div>
+            <div class="metric"><div class="k" id="mResetK">Dernier reset</div><div class="v" id="mReset">—</div></div>
             <div class="metric"><div class="k">Boot</div><div class="v" id="mBoot">—</div></div>
             <div class="metric"><div class="k">RAM</div><div class="v small" id="mRam">—</div></div>
           </div>
@@ -503,7 +243,7 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--stroke-2);bo
 
 <!-- MODAL: create -->
 <div class="scrim" id="scrimNew"><div class="card modal"><div class="card-b" style="padding:26px">
-  <h2>Nouveau serveur</h2><div class="sub">Java et le jar sont téléchargés automatiquement.</div>
+  <h2 id="newTitle">Nouveau serveur</h2><div class="sub" id="newSub">Java et le jar sont téléchargés automatiquement.</div>
   <div class="mbody">
   <div class="field"><label>Nom</label><input id="fName" value="Speedrun" maxlength="40" /></div>
   <div class="row2">
@@ -515,12 +255,16 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--stroke-2);bo
     <div class="hint" id="fRamHint"></div></div>
   <div class="row2">
     <div class="field"><label>Graine</label><select id="fSeedMode">
-      <option value="random">Aléatoire à chaque reset</option><option value="fixed">Fixe</option></select></div>
+      <option value="random" id="fSeedRandom">Aléatoire à chaque reset</option><option value="fixed">Fixe</option></select></div>
     <div class="field"><label>Valeur (si fixe)</label><input id="fSeed" placeholder="ex: 12345" /></div>
   </div>
   <div class="field"><label>Difficulté</label><select id="fDiff">
     <option value="hard">Hard</option><option value="normal">Normal</option><option value="easy">Easy</option><option value="peaceful">Peaceful</option></select></div>
-  <div class="turbo-row" style="margin:6px 0 14px">
+  <div class="field hidden" id="fBackupRow"><label>Sauvegarde automatique</label><select id="fAutoBackup">
+    <option value="0">Désactivée</option><option value="1">Toutes les heures</option><option value="3">Toutes les 3 h</option>
+    <option value="6" selected>Toutes les 6 h</option><option value="24">Une fois par jour</option></select>
+    <div class="hint">Seulement quand le serveur tourne. Les 10 dernières sont gardées.</div></div>
+  <div class="turbo-row" style="margin:6px 0 14px" id="fTurboRow">
     <button class="switch" id="fTurbo" role="switch" aria-checked="false"><i></i></button>
     <div style="flex:1"><div style="font-size:13.5px;font-weight:750">Mode Turbo</div>
       <div class="hint">Double la RAM utilisée, mais le reset devient instantané.</div></div>
@@ -571,6 +315,7 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--stroke-2);bo
     <button class="mtab on" data-pane="srv">Serveur</button>
     <button class="mtab" data-pane="props">server.properties</button>
     <button class="mtab" data-pane="players">Joueurs</button>
+    <button class="mtab" data-pane="backups">Sauvegardes</button>
   </div>
 
   <div class="mbody">
@@ -627,6 +372,22 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--stroke-2);bo
     <div class="plist" id="sOpList"></div>
     <div id="sPlayersNote"></div>
   </div>
+
+  <!-- pane: sauvegardes -->
+  <div class="pane" id="paneBackups">
+    <div class="row2">
+      <div class="field modal-only"><label>Sauvegarde automatique</label><select id="sAutoBackup">
+        <option value="0">Désactivée</option><option value="1">Toutes les heures</option><option value="3">Toutes les 3 h</option>
+        <option value="6">Toutes les 6 h</option><option value="24">Une fois par jour</option></select>
+        <div class="hint">Enregistrée avec « Enregistrer ». Seulement serveur allumé ; les 10 dernières sont gardées.</div></div>
+      <div class="field"><label>&nbsp;</label><button class="btn" id="sBackupNow" type="button">💾 Sauvegarder maintenant</button>
+        <div class="hint" id="sUsage"></div></div>
+    </div>
+    <div class="sectitle">Sauvegardes <span class="n" id="sBackupCount"></span></div>
+    <div class="blist" id="sBackupList"></div>
+    <div class="note">Restaurer remplace le monde actuel, qui est d'abord sauvegardé lui-même
+      (« avant-restauration »). Le serveur est arrêté pendant l'opération puis relancé.</div>
+  </div>
   </div>
 
   <div class="mfoot">
@@ -641,769 +402,12 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--stroke-2);bo
   </div>
 </div></div></div>
 
-<script>
-"use strict";
-/* ============================================================ API ============ */
-const API = {
-  async call(path, opts={}) {
-    const res = await fetch(path, {headers:{'Content-Type':'application/json'}, ...opts});
-    let data = null;
-    try { data = await res.json(); } catch(e){ data = {ok:false, error:'Réponse illisible du panel'}; }
-    if (!res.ok || data.ok === false) throw new Error(data && data.error ? data.error : 'HTTP '+res.status);
-    return data;
-  },
-  get:  (p)      => API.call(p),
-  post: (p,body) => API.call(p, {method:'POST', body: JSON.stringify(body||{})}),
-  del:  (p)      => API.call(p, {method:'DELETE'}),
-};
-
-/* ============================================================ STATE ========== */
-const S = {
-  servers: [], current: null, system: {}, versions: [],
-  autoscroll: true, connected: false, history: [], hIdx: -1,
-  pendingReset: 0, lines: 0, lastTickAt: 0, lastResetAt: 0, playersSig: null,
-  schema: null, propDefaults: {}, newWhitelist: [], newOps: [],
-};
-const $ = (id) => document.getElementById(id);
-const el = (tag, cls, txt) => { const n=document.createElement(tag); if(cls)n.className=cls; if(txt!=null)n.textContent=txt; return n; };
-const cur = () => S.servers.find(s => s.id === S.current) || null;
-
-/* ============================================================ UI HELPERS ===== */
-function toast(msg, kind='', ms=3400){
-  const t = el('div', 'toast '+kind);
-  t.append(el('span','',kind==='ok'?'✅':kind==='err'?'⚠️':'ℹ️'), el('span','',msg));
-  $('toasts').appendChild(t);
-  setTimeout(()=>{ t.classList.add('out'); setTimeout(()=>t.remove(), 320); }, ms);
-}
-function flash(text){
-  const f = $('bigflash'); $('bigflashtxt').textContent = text;
-  f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
-}
-function fireBtn(btn){ btn.classList.remove('fired'); void btn.offsetWidth; btn.classList.add('fired'); }
-function fmtDur(sec){
-  if (sec == null) return '--:--';
-  sec = Math.max(0, Math.floor(sec));
-  const h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60;
-  const p = (n)=>String(n).padStart(2,'0');
-  return h ? `${h}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`;
-}
-function copy(text, label){
-  const done = () => toast((label||'Copié')+' : '+text,'ok',2200);
-  const fail = () => toast('Copie impossible','err');
-  if (navigator.clipboard && window.isSecureContext)
-    navigator.clipboard.writeText(text).then(done).catch(() => legacyCopy(text) ? done() : fail());
-  else if (legacyCopy(text)) done();
-  else fail();
-}
-/* En --lan (http://IP-du-PC), la page n'est pas un « contexte sécurisé » : pas de navigator.clipboard. */
-function legacyCopy(text){
-  const ta = el('textarea'); ta.value = text; ta.setAttribute('readonly', '');
-  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
-  document.body.append(ta); ta.select();
-  let ok = false; try { ok = document.execCommand('copy'); } catch(e){}
-  ta.remove();
-  return ok;
-}
-/* Chips « icône + valeur » : textContent, jamais innerHTML (version, IP... viennent de l'extérieur). */
-function setChip(id, icon, value, suffix){
-  const chip = $(id);
-  chip.textContent = icon + ' ';
-  chip.append(el('b', '', value));
-  if (suffix) chip.append(' ' + suffix);
-}
-const isOn = (id) => $(id).getAttribute('aria-checked') === 'true';
-function flipSwitch(e){
-  const b = e.currentTarget;
-  b.setAttribute('aria-checked', b.getAttribute('aria-checked') === 'true' ? 'false' : 'true');
-}
-document.addEventListener('pointermove', (e)=>{
-  const b = e.target.closest?.('.btn'); if(!b) return;
-  const r = b.getBoundingClientRect();
-  b.style.setProperty('--mx', (e.clientX-r.left)+'px'); b.style.setProperty('--my', (e.clientY-r.top)+'px');
-});
-
-/* ============================================================ RENDER ========= */
-const STATE_LABEL = {
-  stopped:['Arrêté','st-stopped'], starting:['Démarrage…','st-starting'], running:['En ligne','st-running'],
-  stopping:['Arrêt…','st-stopping'], resetting:['Reset…','st-resetting'], installing:['Installation…','st-installing'],
-  error:['Erreur','st-error'],
-};
-
-function dotClass(state){
-  return state==='running' ? 'on' : state==='error' ? 'off' : state==='stopped' ? '' : 'warn';
-}
-let tabsSig = '';
-function renderTabs(){
-  // Appelé à chaque tick (1/s) : on ne reconstruit que si un onglet a changé.
-  const sig = S.current + '|' + S.servers.map(s => s.id + ':' + s.name + ':' + s.state).join(',');
-  if (sig === tabsSig) return;
-  tabsSig = sig;
-  const box = $('tabs'); box.innerHTML = '';
-  S.servers.forEach((s, i) => {
-    const t = el('button', 'tab' + (s.id===S.current?' on':''));
-    const d = el('span','dot ' + dotClass(s.state));
-    t.append(d, el('span','',s.name));
-    if (i < 9){
-      const num = el('span','', String(i+1));
-      num.style.cssText = 'opacity:.4;font-family:var(--mono);font-size:10px';
-      t.append(num);
-    }
-    t.onclick = () => selectServer(s.id);
-    box.appendChild(t);
-  });
-  const add = el('button','tab','＋'); add.style.cssText='width:42px;justify-content:center;padding:0';
-  add.onclick = openCreate; box.appendChild(add);
-}
-
-/* Un plantage de rendu ne doit jamais figer le panel en pleine run. */
-function render(){
-  try { renderInner(); }
-  catch(err){ console.error('render', err); $('brandsub').textContent = 'erreur d’affichage'; }
-}
-function renderInner(){
-  const has = S.servers.length > 0;
-  $('empty').classList.toggle('hidden', has);
-  $('dash').classList.toggle('hidden', !has);
-  if (!has) return;
-  if (!cur()) S.current = S.servers[0].id;
-  renderTabs();
-  const s = cur(); if (!s) return;
-
-  const [lab, cls] = STATE_LABEL[s.state] || STATE_LABEL.stopped;
-  const pill = $('statePill'); pill.className = 'state-pill ' + cls;
-  pill.innerHTML = ''; pill.append(el('span','dot ' + dotClass(s.state)), el('span','',lab));
-
-  setChip('chipAddr', '📋', s.address);
-  setChip('chipVer', '📦', s.version);
-  setChip('chipResets', '🔁', String(s.resets), 'resets');
-  const st = s.settings || {}, crack = st['online-mode'] === 'false';
-  const flags = [st.hardcore === 'true' ? '💀 Hardcore' : '', crack ? '🔓 Comptes crack' : ''].filter(Boolean);
-  const chipFlags = $('chipFlags');
-  chipFlags.textContent = flags.join(' · ');
-  chipFlags.title = crack ? 'Comptes crack acceptés : les pseudos ne sont pas vérifiés' : '';
-  chipFlags.classList.toggle('hidden', !flags.length);
-
-  const busy = ['starting','stopping','resetting','installing'].includes(s.state);
-  const up = s.state === 'running';
-  $('actStart').disabled = up || busy;
-  $('actStop').disabled  = (!up && s.state!=='error') || busy;
-  $('actReset').disabled = busy;
-  $('resetSub').textContent = s.turbo ? (s.standby_ready ? 'instantané ⚡' : 'préchauffage…') : 'monde neuf';
-
-  $('swTurbo').setAttribute('aria-checked', String(!!s.turbo));
-  const warm = $('warmChip'); warm.className = 'warm';
-  if (!s.turbo) { warm.textContent = 'désactivé'; }
-  else if (s.standby_ready) { warm.className='warm ready'; warm.innerHTML='⚡ Remplaçant prêt'; }
-  else if (up) { warm.className='warm booting'; warm.innerHTML='<span class="spinner"></span> Préchauffage'; }
-  else { warm.textContent = 'en attente'; }
-  $('turboHint').textContent = s.turbo
-    ? 'Un second monde tourne en fond. Après un reset, reconnecte-toi immédiatement.'
-    : 'Garde un second monde déjà chargé. Reset ≈ 1 seconde.';
-
-  const live = s.live || {};
-  $('timer').textContent = fmtDur(s.run_seconds);
-  $('timer').classList.toggle('live', up);
-  $('mPlayers').textContent = live.player_count || 0;
-  $('mReset').textContent = s.last_reset_ms == null ? '—'
-    : (s.last_reset_ms < 1500 ? s.last_reset_ms+'ms' : (s.last_reset_ms/1000).toFixed(1)+'s');
-  $('mBoot').textContent = live.boot_seconds ? live.boot_seconds.toFixed(1)+'s' : (busy ? (live.spawn_progress||0)+'%' : '—');
-  $('mRam').textContent = (s.ram_mb/1024).toFixed(1)+' Go' + (s.turbo ? ' ×2' : '');
-
-  // Reconstruit seulement si la liste change : sinon les avatars clignotent à chaque tick.
-  const names = live.players || [];
-  const psig = s.id + (up ? '+' : '-') + names.join(',');
-  if (psig !== S.playersSig){
-    S.playersSig = psig;
-    const pbox = $('players'); pbox.innerHTML = '';
-    if (!names.length) pbox.append(el('span','muted', up?'Personne connecté':'Serveur hors ligne'));
-    else names.forEach(p => {
-      const c = el('span','pl'); const img = el('img'); img.src = 'https://minotar.net/avatar/'+encodeURIComponent(p)+'/24';
-      img.onerror = () => { img.replaceWith(el('span','','👤')); };
-      c.append(img, el('span','',p)); pbox.append(c);
-    });
-  }
-
-  if (s.state === 'error' && live.error) $('brandsub').textContent = live.error.slice(0,60);
-  else $('brandsub').textContent = up ? 'serveur en ligne' : 'prêt';
-}
-
-function renderSystem(){
-  const sys = S.system || {};
-  const jv = sys.java_best;
-  setChip('chipJava', '☕', jv ? 'Java '+jv : 'auto');
-  setChip('chipIp', '🏠', sys.local_ip || '—');
-  if (S.publicIp) setChip('chipPub', '🌐', S.publicIp);
-  const ram = Math.max(2048, Math.min(16384, (sys.ram_total_mb||8192)));
-  $('fRam').max = ram; $('sRam').max = ram;
-  $('fRamHint').textContent = 'RAM détectée : ' + ((sys.ram_total_mb||0)/1024).toFixed(1) + ' Go — conseillé ' +
-    ((sys.ram_suggested_mb||4096)/1024).toFixed(1) + ' Go';
-}
-
-/* ============================================================ CONSOLE ======== */
-const consoleBox = $('console');
-let pending = [], rafQueued = false;
-function pushLine(item){
-  pending.push(item);
-  if (!rafQueued){ rafQueued = true; requestAnimationFrame(drainLines); }
-}
-function drainLines(){
-  rafQueued = false;
-  if (!pending.length) return;
-  const frag = document.createDocumentFragment();
-  for (const it of pending){
-    const row = el('div','ln '+(it.lvl||'info'));
-    const d = new Date((it.t||Date.now()/1000)*1000);
-    // Minecraft prefixe deja l'heure: on la retire, la notre est plus fiable.
-    const text = String(it.line||'').replace(/^\[\d{2}:\d{2}:\d{2}\]\s*/, '');
-    row.append(el('span','tm', d.toTimeString().slice(0,8)), el('span','tx', text));
-    frag.appendChild(row);
-  }
-  pending = [];
-  consoleBox.appendChild(frag);
-  S.lines = consoleBox.childElementCount;
-  while (S.lines > 600){ consoleBox.removeChild(consoleBox.firstChild); S.lines--; }
-  if (S.autoscroll) consoleBox.scrollTop = consoleBox.scrollHeight;
-}
-consoleBox.addEventListener('scroll', ()=>{
-  const atEnd = consoleBox.scrollHeight - consoleBox.scrollTop - consoleBox.clientHeight < 40;
-  if (S.autoscroll !== atEnd){ S.autoscroll = atEnd; $('btnAuto').style.opacity = atEnd ? 1 : .45; }
-});
-async function loadLogs(id){
-  consoleBox.innerHTML = '';
-  try {
-    const r = await API.get('/api/servers/'+id+'/logs');
-    (r.lines||[]).forEach(pushLine);
-  } catch(e){ /* serveur jamais démarré */ }
-}
-
-/* ============================================================ SSE =========== */
-let es = null, reconnectTimer = null;
-function connect(){
-  if (es) es.close();
-  es = new EventSource('/api/events');
-  es.addEventListener('open', ()=> setConn(true));
-  es.addEventListener('hello', (e)=>{ const d = JSON.parse(e.data); S.servers = d.servers; S.system = d.system; renderSystem(); render(); });
-  es.addEventListener('tick', (e)=>{ const d = JSON.parse(e.data); S.servers = d.servers; S.lastTickAt = Date.now(); render(); });
-  es.addEventListener('server', (e)=>{
-    const s = JSON.parse(e.data); const i = S.servers.findIndex(x=>x.id===s.id);
-    if (i<0) S.servers.push(s); else S.servers[i] = s; render();
-  });
-  es.addEventListener('servers', (e)=>{ S.servers = JSON.parse(e.data); render(); });
-  es.addEventListener('log', (e)=>{ const d = JSON.parse(e.data); if (!S.current || d.server===S.current) pushLine(d); });
-  es.addEventListener('job', (e)=> onJob(JSON.parse(e.data)));
-  es.addEventListener('error', ()=>{
-    setConn(false);
-    if (!reconnectTimer) reconnectTimer = setTimeout(()=>{ reconnectTimer=null; connect(); }, 1600);
-  });
-}
-function setConn(on){
-  S.connected = on;
-  $('dotConn').className = 'dot ' + (on?'on':'off');
-  $('chipConn').lastElementChild.textContent = on ? 'Connecté' : 'Reconnexion…';
-}
-
-/* ============================================================ JOBS ========== */
-const jobBar = $('jobbar');
-let jobHideTimer = null;
-function onJob(job){
-  if (job.status === 'running'){
-    jobBar.style.width = Math.max(6, (job.progress||0)*100) + '%';
-    if (job.message) $('brandsub').textContent = job.message;
-    clearTimeout(jobHideTimer);
-  } else {
-    jobBar.style.width = '100%';
-    clearTimeout(jobHideTimer);
-    jobHideTimer = setTimeout(()=>{ jobBar.style.width='0%'; }, 450);
-    if (job.status === 'error') toast(job.error || 'Échec de l’opération', 'err', 7000);
-    else if (job.kind === 'reset'){
-      const ms = job.result && job.result.ms;
-      flash(ms != null && ms < 1500 ? 'NEW WORLD' : 'RESET');
-      toast('Monde neuf ' + (ms!=null ? (ms<1500 ? 'en '+ms+' ms ⚡' : 'en '+(ms/1000).toFixed(1)+' s') : 'prêt') +
-            (job.result && job.result.instant ? ' — reconnecte-toi !' : ''), 'ok', 5000);
-    }
-    else if (job.kind === 'start') toast('Serveur démarré', 'ok');
-    else if (job.kind === 'stop') toast('Serveur arrêté', 'ok', 2200);
-  }
-}
-
-/* ============================================================ ACTIONS ======= */
-async function act(kind, btn){
-  const s = cur(); if (!s) return;
-  if (kind === 'reset'){
-    // Anti double-clic : en Turbo la bascule prend 1 ms, un 2e reset effacerait le monde tout neuf.
-    if (Date.now() - S.lastResetAt < 1200) return;
-    S.lastResetAt = Date.now();
-  }
-  if (btn) fireBtn(btn);
-  try { await API.post('/api/servers/'+s.id+'/'+kind, {}); }
-  catch(e){ toast(e.message, 'err', 6000); }
-}
-function selectServer(id){
-  S.current = id; render(); loadLogs(id);
-  try { localStorage.setItem('mcpanel.current', id); } catch(e){}
-}
-
-$('actStart').onclick = (e)=> act('start', e.currentTarget);
-$('actStop').onclick  = (e)=> act('stop',  e.currentTarget);
-$('actReset').onclick = (e)=> act('reset', e.currentTarget);
-$('swTurbo').onclick = async ()=>{
-  const s = cur(); if (!s) return;
-  const next = !s.turbo;
-  $('swTurbo').setAttribute('aria-checked', String(next));
-  try {
-    await API.post('/api/servers/'+s.id+'/turbo', {enabled: next});
-    toast(next ? 'Turbo activé — le remplaçant démarre' : 'Turbo désactivé', 'ok');
-  } catch(e){ toast(e.message,'err'); }
-};
-$('btnAuto').onclick = ()=>{ S.autoscroll = !S.autoscroll; $('btnAuto').style.opacity = S.autoscroll?1:.45;
-  if (S.autoscroll) consoleBox.scrollTop = consoleBox.scrollHeight; };
-$('btnClear').onclick = ()=>{ consoleBox.innerHTML=''; S.lines=0; };
-$('chipIp').onclick = ()=> copy(S.system.local_ip || 'localhost', 'IP locale');
-$('chipPub').onclick = ()=>{ const s=cur(); if(S.publicIp) copy(S.publicIp+(s && s.port!==25565 ? ':'+s.port : ''), 'Adresse pour ton pote'); };
-$('chipAddr').onclick = ()=>{ const s=cur(); if(s) copy(s.address, 'Adresse serveur'); };
-
-/* commandes */
-async function sendCmd(cmd){
-  const s = cur(); if (!s || !cmd.trim()) return;
-  try {
-    await API.post('/api/servers/'+s.id+'/command', {command: cmd});
-    S.history.push(cmd); S.hIdx = S.history.length;
-  } catch(e){ toast(e.message, 'err'); }
-}
-$('btnSend').onclick = ()=>{ sendCmd($('cmdInput').value); $('cmdInput').value=''; };
-$('cmdInput').addEventListener('keydown', (e)=>{
-  if (e.key === 'Enter'){ sendCmd(e.target.value); e.target.value=''; }
-  else if (e.key === 'ArrowUp'){ if (S.hIdx>0){ S.hIdx--; e.target.value = S.history[S.hIdx]; e.preventDefault(); } }
-  else if (e.key === 'ArrowDown'){ if (S.hIdx < S.history.length-1){ S.hIdx++; e.target.value = S.history[S.hIdx]; } else { S.hIdx=S.history.length; e.target.value=''; } }
-  else if (e.key === 'Escape'){ e.target.blur(); }
-});
-document.querySelectorAll('.qbtn').forEach(b => b.onclick = () => {
-  if (b.dataset.cmd) return sendCmd(b.dataset.cmd);
-  const who = prompt(b.dataset.op === 'op' ? 'Pseudo à passer OP :' : 'Pseudo à whitelister :');
-  if (who) sendCmd((b.dataset.op === 'op' ? 'op ' : 'whitelist add ') + who.trim());
-});
-
-/* ============================================================ MODALS ======== */
-function openModal(id){ $(id).classList.add('on'); }
-function closeModal(id){ $(id).classList.remove('on'); }
-document.querySelectorAll('[data-close]').forEach(b => b.onclick = e => e.target.closest('.scrim').classList.remove('on'));
-document.querySelectorAll('.scrim').forEach(sc => sc.addEventListener('click', e => { if (e.target === sc) sc.classList.remove('on'); }));
-
-/* ------------------------------------------------ éditeur de server.properties */
-function makeSwitch(on){
-  const b = el('button','switch'); b.type='button'; b.setAttribute('role','switch');
-  b.setAttribute('aria-checked', String(!!on)); b.appendChild(el('i'));
-  b.onclick = () => {
-    b.setAttribute('aria-checked', b.getAttribute('aria-checked')==='true'?'false':'true');
-    b.dispatchEvent(new Event('change', {bubbles:true}));
-  };
-  return b;
-}
-function tagEl(cls, text){ return el('span','tag '+cls, text); }
-
-/** Construit le formulaire et renvoie { read(), setSaved(key, value), filter(q) }.
- *  opts.exclude : clés à ne pas afficher (pilotées par un autre contrôle de la fenêtre). */
-function buildPropsForm(container, schema, values, opts){
-  opts = opts || {};
-  container.innerHTML = '';
-  const fields = new Map();          // key -> {row, get, initial, spec, setSaved}
-  const known = new Set(schema.fields.map(f => f.key));
-  const exclude = new Set(opts.exclude || []);
-  const buckets = new Map(schema.groups.map(g => [g.id, []]));
-  schema.fields.forEach(f => { if (!exclude.has(f.key)) buckets.get(f.group).push(f); });
-
-  // Clés présentes dans le fichier mais absentes du schéma : mods, plugins,
-  // versions plus récentes. On les édite en texte plutôt que de les cacher.
-  const extras = Object.keys(values || {})
-    .filter(k => !known.has(k) && k !== 'query.port')
-    .sort()
-    .map(k => ({key:k, group:'other', type:'str', label:k, unknown:true}));
-  if (extras.length) buckets.set('other', extras);
-
-  const groupLabels = new Map(schema.groups.map(g => [g.id, g.label]));
-  groupLabels.set('other', 'Clés non standard');
-
-  let first = true;
-  for (const [gid, list] of buckets){
-    if (!list.length) continue;
-    const det = el('details','pgroup'); if (first){ det.open = true; first = false; }
-    const sum = document.createElement('summary');
-    sum.append(el('span','', groupLabels.get(gid) || gid), el('span','count', list.length + ' réglages'));
-    det.append(sum);
-    const body = el('div','pbody');
-    list.forEach(f => body.append(propRow(f, values, fields)));
-    det.append(body);
-    container.append(det);
-  }
-
-  return {
-    read(){
-      const changed = {};
-      for (const [key, f] of fields){
-        if (f.spec.locked) continue;
-        const now = f.get();
-        if (now !== f.initial) changed[key] = now;
-      }
-      return changed;
-    },
-    /** Valeur déjà enregistrée ailleurs (interrupteur rapide) : met la ligne à jour
-     *  sans reconstruire le formulaire, donc sans perdre les modifications en cours. */
-    setSaved(key, value){
-      const f = fields.get(key);
-      if (f) f.setSaved(String(value));
-    },
-    filter(query){
-      const q = (query||'').trim().toLowerCase();
-      container.querySelectorAll('details.pgroup').forEach(det => {
-        let visible = 0;
-        det.querySelectorAll('.prow').forEach(row => {
-          const hit = !q || row.dataset.search.includes(q);
-          row.classList.toggle('hidden', !hit);
-          if (hit) visible++;
-        });
-        det.classList.toggle('hidden', visible === 0);
-        if (q && visible) det.open = true;
-      });
-    },
-  };
-}
-
-function propRow(spec, values, fields){
-  const raw = values && values[spec.key] != null ? String(values[spec.key]) : (spec.default || '');
-  const row = el('div','prow' + (spec.locked ? ' locked' : ''));
-  row.dataset.search = (spec.label + ' ' + spec.key + ' ' + (spec.hint||'')).toLowerCase();
-
-  const lbl = el('div','lbl');
-  lbl.append(el('span','', spec.label));
-  lbl.append(el('code','', spec.key));
-  if (spec.hint) lbl.append(el('div','hint', spec.hint));
-  const tags = el('div','tags');
-  if (spec.locked) tags.append(tagEl('lock','géré par le panel'));
-  if (spec.restart) tags.append(tagEl('rst','redémarrage requis'));
-  if (spec.unknown) tags.append(tagEl('lock','hors schéma'));
-  if (tags.childElementCount) lbl.append(tags);
-
-  const ctl = el('div','ctl');
-  let get, set;
-  if (spec.type === 'bool'){
-    // invert : l'interrupteur montre l'inverse de la valeur (« accepter les crack » = online-mode=false).
-    const inv = !!spec.invert;
-    const sw = makeSwitch((raw === 'true') !== inv);
-    if (spec.locked) sw.disabled = true;
-    ctl.append(sw);
-    get = () => ((sw.getAttribute('aria-checked') === 'true') !== inv) ? 'true' : 'false';
-    set = v => sw.setAttribute('aria-checked', String((v === 'true') !== inv));
-    sw.addEventListener('change', mark);
-  } else if (spec.type === 'enum'){
-    const sel = document.createElement('select');
-    (spec.options||[]).forEach(o => { const op = el('option','', o.replace('minecraft:','')); op.value = o; sel.append(op); });
-    if (!spec.options.includes(raw)) { const op = el('option','', raw); op.value = raw; sel.append(op); }
-    sel.value = raw; sel.disabled = !!spec.locked; ctl.append(sel);
-    get = () => sel.value; set = v => { sel.value = v; };
-    sel.addEventListener('change', mark);
-  } else {
-    const inp = document.createElement('input');
-    inp.type = spec.type === 'int' ? 'number' : 'text';
-    if (spec.min != null) inp.min = spec.min;
-    if (spec.max != null) inp.max = spec.max;
-    inp.value = raw; inp.disabled = !!spec.locked; ctl.append(inp);
-    get = () => inp.value.trim(); set = v => { inp.value = v; };
-    inp.addEventListener('input', mark);
-  }
-  row.append(lbl, ctl);
-  const field = {row, get, initial: raw, spec};
-  field.setSaved = v => { set(v); field.initial = v; mark(); };
-  fields.set(spec.key, field);
-  function mark(){ row.classList.toggle('changed', get() !== field.initial); }
-  return row;
-}
-
-/* ------------------------------------------------------------- listes joueurs */
-function renderPlayerChips(box, names, onRemove){
-  box.innerHTML = '';
-  if (!names.length){ box.append(el('span','muted','Personne pour l’instant')); return; }
-  names.forEach(entry => {
-    const name = typeof entry === 'string' ? entry : entry.name;
-    const chip = el('span','pchip');
-    const img = el('img'); img.alt = '';
-    img.src = 'https://minotar.net/avatar/' + encodeURIComponent(name) + '/26';
-    img.onerror = () => img.replaceWith(el('span','','👤'));
-    chip.append(img, el('span','', name));
-    const rm = el('button','rm','×'); rm.type = 'button'; rm.title = 'Retirer ' + name;
-    rm.onclick = () => onRemove(name);
-    chip.append(rm);
-    box.append(chip);
-  });
-}
-
-/* ----------------------------------------------------------------- création */
-let createForm = null;
-async function loadSchema(){
-  if (S.schema) return S.schema;
-  const r = await API.get('/api/properties');
-  S.schema = r.schema; S.propDefaults = r.defaults || {};
-  return S.schema;
-}
-async function openCreate(){
-  openModal('scrimNew');
-  $('fPort').value = 25565 + S.servers.length;
-  $('fRam').value = Math.min(S.system.ram_suggested_mb || 4096, +$('fRam').max);
-  $('fRamLab').textContent = $('fRam').value + ' Mo';
-  S.newWhitelist = []; S.newOps = [];
-  drawNewPlayers();
-  $('fAdvanced').open = false;
-  $('fCrack').setAttribute('aria-checked', 'false');  // option sensible : toujours repartir de « non »
-
-  if (!S.versions.length){
-    try {
-      // Toutes les versions avec un jar serveur (1.2.5 et après), pas seulement les 40 dernières.
-      const r = await API.get('/api/versions?kind=release&limit=1000');
-      S.versions = r.versions;
-      const sel = $('fVersion');
-      sel.innerHTML = '<option value="">Dernière ('+r.latest+')</option>';
-      r.versions.forEach(v => { const o = el('option','',v.id + '  ·  ' + v.released); o.value = v.id; sel.appendChild(o); });
-    } catch(e){ toast('Liste des versions indisponible (hors ligne ?)','err'); }
-  }
-  try {
-    const schema = await loadSchema();
-    // Base = ce que le serveur écrirait tout seul, pour n'envoyer que les écarts.
-    const base = {};
-    schema.fields.forEach(f => base[f.key] = f.default || '');
-    Object.assign(base, S.propDefaults);
-    // online-mode a son interrupteur dédié plus haut : pas de doublon dans les options avancées.
-    createForm = buildPropsForm($('fPropForm'), schema, base, {exclude: ['online-mode']});
-  } catch(e){ toast('Schéma des propriétés indisponible : '+e.message, 'err'); }
-}
-function drawNewPlayers(){
-  $('fWlCount').textContent = S.newWhitelist.length ? S.newWhitelist.length + ' joueur(s)' : '';
-  $('fOpCount').textContent = S.newOps.length ? S.newOps.length + ' joueur(s)' : '';
-  renderPlayerChips($('fWlList'), S.newWhitelist, n => { S.newWhitelist = S.newWhitelist.filter(x=>x!==n); drawNewPlayers(); });
-  renderPlayerChips($('fOpList'), S.newOps, n => { S.newOps = S.newOps.filter(x=>x!==n); drawNewPlayers(); });
-}
-function addNewPlayer(which){
-  const input = $(which === 'ops' ? 'fOpInput' : 'fWlInput');
-  const name = input.value.trim();
-  if (!name) return;
-  if (!/^[A-Za-z0-9_]{3,16}$/.test(name)) return toast('Pseudo invalide : 3 à 16 caractères, lettres, chiffres et _','err');
-  const list = which === 'ops' ? S.newOps : S.newWhitelist;
-  if (list.some(x => x.toLowerCase() === name.toLowerCase())) return toast(name + ' est déjà dans la liste','err');
-  list.push(name); input.value = ''; drawNewPlayers();
-}
-$('fWlAdd').onclick = () => addNewPlayer('whitelist');
-$('fOpAdd').onclick = () => addNewPlayer('ops');
-$('fWlInput').addEventListener('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); addNewPlayer('whitelist'); } });
-$('fOpInput').addEventListener('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); addNewPlayer('ops'); } });
-$('fPropSearch').addEventListener('input', e => createForm && createForm.filter(e.target.value));
-
-$('btnNew').onclick = openCreate; $('btnCreateFirst').onclick = openCreate;
-$('fRam').oninput = e => $('fRamLab').textContent = e.target.value + ' Mo';
-$('fTurbo').onclick = flipSwitch;
-$('fCrack').onclick = flipSwitch;
-
-$('btnCreate').onclick = async () => {
-  const btn = $('btnCreate');
-  if (btn.disabled) return;  // double clic = deux serveurs créés
-  const settings = Object.assign(
-    {difficulty: $('fDiff').value, 'online-mode': isOn('fCrack') ? 'false' : 'true'},
-    createForm ? createForm.read() : {});
-  const body = {
-    name: $('fName').value || 'Speedrun',
-    version: $('fVersion').value,
-    ram_mb: +$('fRam').value,
-    port: +$('fPort').value,
-    turbo: isOn('fTurbo'),
-    seed_mode: $('fSeedMode').value,
-    seed: $('fSeed').value.trim(),
-    settings,
-    whitelist: S.newWhitelist,
-    ops: S.newOps,
-    start: true,
-  };
-  btn.disabled = true;
-  try {
-    const r = await API.post('/api/servers', body);
-    closeModal('scrimNew');
-    S.current = r.server.id;
-    toast('Serveur créé — téléchargement et démarrage…', 'ok');
-    (r.notes || []).forEach(n => toast(n, 'err', 8000));
-    await refresh(); loadLogs(r.server.id);
-  } catch(e){ toast(e.message, 'err', 7000); }
-  finally { btn.disabled = false; }
-};
-
-/* ----------------------------------------------------------------- réglages */
-let settingsForm = null;
-document.querySelectorAll('.mtab').forEach(tab => tab.onclick = () => {
-  document.querySelectorAll('.mtab').forEach(t => t.classList.toggle('on', t === tab));
-  document.querySelectorAll('#scrimSet .pane').forEach(p => p.classList.remove('on'));
-  $({srv:'paneSrv', props:'paneProps', players:'panePlayers'}[tab.dataset.pane]).classList.add('on');
-});
-
-$('btnSettings').onclick = async () => {
-  const s = cur(); if (!s) return toast('Aucun serveur sélectionné','err');
-  $('setSub').textContent = s.name + ' · ' + s.version + ' · ' + s.id;
-  $('sName').value = s.name; $('sPort').value = s.port;
-  $('sRam').value = s.ram_mb; $('sRamLab').textContent = s.ram_mb + ' Mo';
-  $('sSeedMode').value = s.seed_mode; $('sSeed').value = s.seed || '';
-  $('sPropForm').innerHTML = '<div class="muted" style="padding:14px 0">Chargement…</div>';
-  $('sPropSearch').value = '';
-  openModal('scrimSet');
-  try {
-    const r = await API.get('/api/servers/'+s.id+'/settings');
-    settingsForm = buildPropsForm($('sPropForm'), r.schema, r.settings);
-  } catch(e){
-    $('sPropForm').innerHTML = '';
-    $('sPropForm').append(el('div','note warn','Impossible de lire server.properties : '+e.message));
-  }
-  loadPlayers(s.id);
-};
-$('sRam').oninput = e => $('sRamLab').textContent = e.target.value + ' Mo';
-$('sPropSearch').addEventListener('input', e => settingsForm && settingsForm.filter(e.target.value));
-
-async function loadPlayers(id){
-  try {
-    const r = await API.get('/api/servers/'+id+'/players');
-    drawPlayers(r);
-  } catch(e){ toast('Liste des joueurs indisponible : '+e.message, 'err'); }
-}
-function drawPlayers(r){
-  $('sWlToggle').setAttribute('aria-checked', String(!!r.whitelist_enabled));
-  $('sCrackToggle').setAttribute('aria-checked', String(!r.online_mode));
-  $('sWlCount').textContent = r.whitelist.length ? r.whitelist.length + ' joueur(s)' : '';
-  $('sOpCount').textContent = r.ops.length ? r.ops.length + ' joueur(s)' : '';
-  renderPlayerChips($('sWlList'), r.whitelist, n => editPlayer('whitelist','remove',n));
-  renderPlayerChips($('sOpList'), r.ops, n => editPlayer('ops','remove',n));
-  const note = $('sPlayersNote'); note.innerHTML = '';
-  if (r.note) note.append(el('div','note warn', r.note));
-  if (!r.online_mode) note.append(el('div','note warn',
-    'Comptes crack acceptés : aucun pseudo n’est vérifié. Quelqu’un qui connaît l’adresse peut entrer ' +
-    'sous ton pseudo ou celui d’un OP, et la whitelist ne l’arrête pas (elle se base sur le pseudo). ' +
-    'Ne donne l’adresse qu’à des gens de confiance.'));
-}
-async function editPlayer(which, action, player){
-  const s = cur(); if (!s) return;
-  try {
-    const r = await API.post('/api/servers/'+s.id+'/players', {list:which, action, player});
-    drawPlayers(r);
-    toast((action==='add'?'Ajouté : ':'Retiré : ') + player + (s.state==='running' ? ' (appliqué en direct)' : ''), 'ok', 2600);
-  } catch(e){ toast(e.message, 'err', 6000); }
-}
-function addPlayerLive(which){
-  const input = $(which === 'ops' ? 'sOpInput' : 'sWlInput');
-  const name = input.value.trim();
-  if (!name) return;
-  input.value = '';
-  editPlayer(which, 'add', name);
-}
-$('sWlAdd').onclick = () => addPlayerLive('whitelist');
-$('sOpAdd').onclick = () => addPlayerLive('ops');
-$('sWlInput').addEventListener('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); addPlayerLive('whitelist'); } });
-$('sOpInput').addEventListener('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); addPlayerLive('ops'); } });
-$('sWlToggle').onclick = async () => {
-  const s = cur(); if (!s) return;
-  const sw = $('sWlToggle');
-  const next = sw.getAttribute('aria-checked') !== 'true';
-  sw.setAttribute('aria-checked', String(next));
-  try {
-    const value = next ? 'true' : 'false';
-    await API.post('/api/servers/'+s.id+'/settings', {settings:{'white-list': value}});
-    toast('Whitelist ' + (next ? 'activée' : 'désactivée'), 'ok', 2400);
-    if (settingsForm) settingsForm.setSaved('white-list', value);
-  } catch(e){ sw.setAttribute('aria-checked', String(!next)); toast(e.message,'err'); }
-};
-$('sCrackToggle').onclick = async () => {
-  const s = cur(); if (!s) return;
-  const sw = $('sCrackToggle');
-  const next = sw.getAttribute('aria-checked') !== 'true';  // true = accepter les comptes crack
-  sw.setAttribute('aria-checked', String(next));
-  try {
-    const value = next ? 'false' : 'true';  // valeur de online-mode
-    await API.post('/api/servers/'+s.id+'/settings', {settings:{'online-mode': value}});
-    if (settingsForm) settingsForm.setSaved('online-mode', value);
-    toast((next ? 'Comptes crack acceptés' : 'Comptes crack refusés') +
-          (s.state === 'running' ? ' — pris en compte au prochain reset ou redémarrage' : ''), 'ok', 4500);
-    loadPlayers(s.id);
-  } catch(e){ sw.setAttribute('aria-checked', String(!next)); toast(e.message,'err'); }
-};
-
-$('btnSaveSet').onclick = async () => {
-  const s = cur(); if (!s) return;
-  const settings = settingsForm ? settingsForm.read() : {};
-  try {
-    const r = await API.post('/api/servers/'+s.id, {
-      name: $('sName').value, port: +$('sPort').value, ram_mb: +$('sRam').value,
-      seed_mode: $('sSeedMode').value, seed: $('sSeed').value.trim(),
-      settings,
-    });
-    // Le backend dit ce qui a été refusé et ce qui n'a pas pu s'appliquer à chaud
-    // (avant : S.schema, null tant que la fenêtre de création n'avait jamais été ouverte).
-    const rejected = r.rejected || [], later = r.restart_needed || [];
-    const n = Object.keys(settings).length - rejected.length;
-    closeModal('scrimSet');
-    toast(n > 0 ? n + ' réglage(s) enregistré(s)' : 'Réglages enregistrés', 'ok');
-    if (rejected.length) toast('Valeur refusée pour : ' + rejected.join(', '), 'err', 8000);
-    if (later.length) toast('Pris en compte au prochain reset ou redémarrage : ' + later.join(', '), '', 8000);
-    refresh();
-  } catch(e){ toast(e.message, 'err'); }
-};
-$('btnClean').onclick = async () => {
-  const s = cur(); if (!s) return;
-  if (!confirm('Supprimer mondes, logs et caches de « '+s.name+' » ? La configuration est conservée.')) return;
-  try { await API.post('/api/servers/'+s.id+'/clean'); closeModal('scrimSet'); toast('Nettoyage lancé','ok'); }
-  catch(e){ toast(e.message,'err'); }
-};
-$('btnDelete').onclick = async () => {
-  const s = cur(); if (!s) return;
-  if (!confirm('Supprimer définitivement le serveur « '+s.name+' » et tous ses fichiers ?')) return;
-  try {
-    await API.del('/api/servers/'+s.id);
-    closeModal('scrimSet'); S.current = null; toast('Serveur supprimé','ok'); refresh();
-  } catch(e){ toast(e.message,'err'); }
-};
-
-/* ============================================================ KEYBOARD ====== */
-document.addEventListener('keydown', (e) => {
-  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
-  if (e.key === 'Escape') document.querySelectorAll('.scrim.on').forEach(s=>s.classList.remove('on'));
-  // e.repeat : touche R maintenue = rafale de resets.
-  if (typing || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
-  const k = e.key.toLowerCase();
-  if (k === 'r'){ e.preventDefault(); if(!$('actReset').disabled) act('reset', $('actReset')); }
-  else if (k === 's'){ e.preventDefault(); if(!$('actStart').disabled) act('start', $('actStart')); }
-  else if (k === 'x'){ e.preventDefault(); if(!$('actStop').disabled) act('stop', $('actStop')); }
-  else if (k === 'c'){ e.preventDefault(); $('cmdInput').focus(); }
-  else if (k === 'n'){ e.preventDefault(); openCreate(); }
-  else if (k === '?'){ toast('R reset · S start · X stop · C console · N nouveau · 1-9 serveur', '', 6000); }
-  else if (/^[1-9]$/.test(k)){ const s = S.servers[+k-1]; if (s) selectServer(s.id); }
-});
-
-/* ============================================================ BOOT ========== */
-async function refresh(){
-  try {
-    const d = await API.get('/api/state');
-    S.servers = d.servers; S.system = d.system;
-    if (!S.current && S.servers.length){
-      let saved = null; try { saved = localStorage.getItem('mcpanel.current'); } catch(e){}
-      S.current = (saved && S.servers.some(s=>s.id===saved)) ? saved : S.servers[0].id;
-    }
-    renderSystem(); render();
-    if (S.current) loadLogs(S.current);
-  } catch(e){ toast('Panel injoignable : '+e.message, 'err', 8000); }
-}
-/* horloge locale du timer: évite d'attendre le tick serveur */
-setInterval(() => {
-  const s = cur(); if (!s || s.state !== 'running' || s.run_seconds == null) return;
-  const drift = (Date.now() - S.lastTickAt)/1000;
-  $('timer').textContent = fmtDur(s.run_seconds + (drift > 0 && drift < 5 ? drift : 0));
-}, 250);
-
-async function loadPublicIp(){
-  try { const r = await API.get('/api/ip'); S.publicIp = r.public; }
-  catch(e){ S.publicIp = null; }
-  setChip('chipPub', '🌐', S.publicIp || 'hors ligne');
-}
-
-refresh(); connect(); loadPublicIp();
-</script>
+<script src="js/core.js"></script>
+<script src="js/forms.js"></script>
+<script src="js/cockpit.js"></script>
+<script src="js/create.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/views.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>

@@ -11,7 +11,7 @@ import uuid
 from pathlib import Path
 
 from . import config as cfg
-from . import deps, players, props
+from . import backups, deps, players, props
 from .bus import BUS
 from .instance import ERROR, RESETTING, RUNNING, STARTING, STOPPED, ServerProcess
 from .jobs import RUNNER
@@ -119,6 +119,8 @@ def purge_trash() -> None:
         threading.Thread(target=shutil.rmtree, args=(child,), kwargs={"ignore_errors": True}, daemon=True).start()
 
 
+KINDS = ("speedrun", "survival")
+
 DEFAULT_META = {
     "name": "Speedrun",
     "version": "",
@@ -130,6 +132,9 @@ DEFAULT_META = {
     "created": 0.0,
     "resets": 0,
     "best_boot": None,
+    "kind": "speedrun",          # speedrun | survival : décide du panel, des défauts, du reset
+    "auto_backup_hours": 0,      # 0 = pas de sauvegarde automatique
+    "last_backup": None,
 }
 
 
@@ -397,7 +402,7 @@ class ManagedServer:
         overrides = {"server-port": port, "query.port": port}
         if fresh_seed:
             overrides["level-seed"] = self._seed_value()
-        props.bootstrap(path / "server.properties", port, overrides)
+        props.bootstrap(path / "server.properties", port, overrides, props.defaults_for(self.kind))
 
         if path != self.dir:  # slot turbo: on recopie la config canonique
             for fname in ("whitelist.json", "ops.json", "banned-players.json", "banned-ips.json"):
@@ -447,7 +452,7 @@ class ManagedServer:
             if self.live.alive:
                 return {"already": True}
         java, jar = self.ensure_deps(report)
-        turbo = bool(self.meta.get("turbo"))
+        turbo = self.turbo_enabled
         public_port = int(self.meta["port"])
         ram = int(self.meta.get("ram_mb") or cfg.suggested_ram_mb())
 
@@ -465,7 +470,9 @@ class ManagedServer:
         self.standby_label = None
         proc = self.slot(MAIN)
         self.run_started = None
-        self._launch_slot(proc, public_port, ram, fresh_seed=fresh_seed, report=report)
+        # Monde pas encore généré : la graine réglée depuis la création doit s'appliquer.
+        fresh = fresh_seed or not self.world_dirs(proc.workdir)
+        self._launch_slot(proc, public_port, ram, fresh_seed=fresh, report=report)
         if report:
             report("Serveur prêt en %.1fs" % (proc.boot_seconds or 0), 1.0)
         BUS.emit("server", self.snapshot())
@@ -545,8 +552,11 @@ class ManagedServer:
 
     def reset(self, report=None) -> dict:
         """Monde neuf le plus vite possible. Cœur du workflow speedrun."""
+        if self.kind != "speedrun":
+            # Un reset efface le monde : jamais sur un monde gardé des mois.
+            raise RuntimeError("Le reset n'existe que pour les serveurs speedrun.")
         t0 = time.time()
-        turbo = bool(self.meta.get("turbo"))
+        turbo = self.turbo_enabled
         java, jar = (self._java, self._jar) if self.deps_ready else self.ensure_deps(report)
         ram = int(self.meta.get("ram_mb") or cfg.suggested_ram_mb())
 
@@ -695,6 +705,37 @@ class ManagedServer:
 
         RUNNER.submit("standby", job, target=self.id, dedupe=True)
 
+    # ------------------------------------------------------------ sauvegardes
+    @property
+    def kind(self) -> str:
+        return self.meta.get("kind") if self.meta.get("kind") in KINDS else "speedrun"
+
+    @property
+    def turbo_enabled(self) -> bool:
+        return bool(self.meta.get("turbo")) and self.kind == "speedrun"
+
+    def backup(self, report=None, label: str = "manuel") -> dict:
+        result = backups.create(self, label, report)
+        self.meta["last_backup"] = time.time()
+        self.save()
+        BUS.emit("server", self.snapshot())
+        return result
+
+    def restore(self, name: str, report=None) -> dict:
+        result = backups.restore(self, name, report)
+        BUS.emit("server", self.snapshot())
+        return result
+
+    def usage(self) -> dict:
+        return {"server": backups.disk_usage(self.dir), "backups": backups.disk_usage(backups.folder(self.id))}
+
+    def backup_due(self, now: float) -> bool:
+        hours = float(self.meta.get("auto_backup_hours") or 0)
+        if hours <= 0 or not self.live.alive or self.live.state != RUNNING:
+            return False
+        last = max(self.meta.get("last_backup") or 0, self.live.started_at or 0)
+        return now - last >= hours * 3600
+
     # ------------------------------------------------------- whitelist et OP
     def _list_path(self, which: str) -> Path:
         return self.dir / ("ops.json" if which == "ops" else "whitelist.json")
@@ -755,6 +796,8 @@ class ManagedServer:
         return payload
 
     def set_turbo(self, on: bool) -> None:
+        if on and self.kind != "speedrun":
+            raise RuntimeError("Le mode Turbo n'existe que pour les serveurs speedrun.")
         was = bool(self.meta.get("turbo"))
         self.meta["turbo"] = bool(on)
         self.save()
@@ -764,6 +807,8 @@ class ManagedServer:
     def clean(self, report=None) -> dict:
         """Remise à zéro complète: mondes, logs, caches, slots turbo. Config conservée."""
         self.stop(report)
+        if self.kind != "speedrun" and self.world_dirs(self.live.workdir):
+            self.backup(report, "avant-nettoyage")  # filet de sécurité : un monde de survie ne se perd pas
         removed = 0
         keep = {"panel.json", "server.properties", "whitelist.json", "ops.json", "eula.txt", "banned-players.json", "banned-ips.json"}
         for child in list(self.dir.iterdir()):
@@ -813,6 +858,9 @@ class ManagedServer:
             # inutile de pousser 45 clés à chaque tick SSE.
             "settings": {k: settings.get(k, "") for k in SNAPSHOT_KEYS if k in settings},
             "deps_ready": self.deps_ready,
+            "kind": self.kind,
+            "auto_backup_hours": self.meta.get("auto_backup_hours") or 0,
+            "last_backup": self.meta.get("last_backup"),
         }
 
 
@@ -833,8 +881,19 @@ class Manager:
 
     def _ticker(self) -> None:
         """Pouls régulier: rafraîchit les compteurs UI et purge les clients morts."""
+        last_backup_check = 0.0
         while True:
             time.sleep(1.0)
+            now = time.time()
+            if now - last_backup_check >= 60:
+                last_backup_check = now
+                for srv in list(self.servers.values()):
+                    try:
+                        if srv.backup_due(now):
+                            RUNNER.submit("backup", lambda rep, s=srv: s.backup(rep, backups.AUTO_LABEL),
+                                          target=srv.id, dedupe=True)
+                    except Exception:  # noqa: BLE001 - une sauvegarde ratée ne doit pas tuer le pouls
+                        pass
             try:
                 if BUS.count:
                     BUS.emit("tick", {"servers": [s.snapshot() for s in list(self.servers.values())], "t": time.time()})
@@ -854,7 +913,10 @@ class Manager:
 
     def create(self, name: str, version: str = "", ram_mb: int = 0, port: int = 0, turbo: bool = False,
                seed: str = "", seed_mode: str = "random", settings: dict | None = None,
-               whitelist: list | None = None, ops: list | None = None) -> ManagedServer:
+               whitelist: list | None = None, ops: list | None = None, kind: str = "speedrun",
+               auto_backup_hours: float = 0) -> ManagedServer:
+        if kind not in KINDS:
+            raise ValueError("Type de serveur inconnu : %s" % kind)
         with self.lock:
             base = slugify(name)
             sid, n = base, 2
@@ -870,7 +932,9 @@ class Manager:
                 "version": version,
                 "ram_mb": int(ram_mb) or cfg.suggested_ram_mb(),
                 "port": chosen,
-                "turbo": bool(turbo),
+                "turbo": bool(turbo) and kind == "speedrun",
+                "kind": kind,
+                "auto_backup_hours": max(0.0, float(auto_backup_hours or 0)),
                 "seed": seed,
                 "seed_mode": seed_mode,
                 "created": time.time(),
@@ -915,7 +979,9 @@ class Manager:
         srv = self.get(sid)
         if "version" in patch and patch["version"] != srv.meta.get("version"):
             srv.deps_ready = False  # sinon un reset relancerait l'ancien jar
-        allowed = ("name", "version", "ram_mb", "port", "turbo", "seed", "seed_mode")
+        allowed = ("name", "version", "ram_mb", "port", "seed", "seed_mode")
+        if "auto_backup_hours" in patch:
+            srv.meta["auto_backup_hours"] = max(0.0, float(patch["auto_backup_hours"] or 0))
         for key in allowed:
             if key in patch:
                 srv.meta[key] = patch[key]

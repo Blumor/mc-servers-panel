@@ -63,7 +63,7 @@ jobs:
           try {
             if ($ping.app -ne "MC Speedrun Panel") { throw "Le panel ne répond pas" }
             $page = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:18765/"
-            if ($page.Content -notmatch "Speedrun Panel") { throw "Interface absente de l'exe" }
+            if ($page.Content -notmatch "MC Panel") { throw "Interface absente de l'exe" }
             if (-not (Test-Path (Join-Path $dir "mcpanel-data\servers"))) { throw "mcpanel-data absent à côté de l'exe" }
             $second = Start-Process -FilePath $exe -ArgumentList "--no-browser", "--port", "18765" -PassThru -Wait
             if ($second.ExitCode -ne 0) { throw "Second lancement : code $($second.ExitCode)" }

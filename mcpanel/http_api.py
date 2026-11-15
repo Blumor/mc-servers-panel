@@ -16,7 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import config as cfg
-from . import deps, props
+from . import backups, deps, props
 from .bus import BUS
 from .jobs import RUNNER
 from .manager import local_ip, manager, port_busy
@@ -228,7 +228,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.json({"ok": True, "local": local_ip(), "public": public_ip()})
 
         if parts == ["properties"]:
-            return self.json({"ok": True, "schema": props.schema_payload(), "defaults": props.SPEEDRUN_DEFAULTS})
+            kind = (query.get("kind") or ["speedrun"])[0]
+            return self.json({"ok": True, "schema": props.schema_payload(), "defaults": props.defaults_for(kind)})
 
         if len(parts) == 2 and parts[0] == "jobs":
             job = RUNNER.get(parts[1])
@@ -256,6 +257,10 @@ class Handler(BaseHTTPRequestHandler):
                 })
             if parts[2] == "players":
                 return self.json({"ok": True, **srv.get_players()})
+            if parts[2] == "backups":
+                return self.json({"ok": True, "backups": backups.list_backups(srv.id)})
+            if parts[2] == "usage":
+                return self.json({"ok": True, **srv.usage()})
 
         raise KeyError("Route inconnue: %s" % path)
 
@@ -276,6 +281,8 @@ class Handler(BaseHTTPRequestHandler):
                 settings=body.get("settings") or None,
                 whitelist=body.get("whitelist") or None,
                 ops=body.get("ops") or None,
+                kind=body.get("kind") or "speedrun",
+                auto_backup_hours=float(body.get("auto_backup_hours") or 0),
             )
             if body.get("start"):
                 RUNNER.submit("start", lambda rep: srv.start(rep), target=srv.id)
@@ -353,6 +360,9 @@ class Handler(BaseHTTPRequestHandler):
                 job = RUNNER.submit("restart", lambda rep: srv.restart(rep), target=srv.id, dedupe=True)
                 return self.json({"ok": True, "job": job.as_dict()}, 202)
 
+            if action in ("reset", "turbo") and srv.kind != "speedrun":
+                return self.fail("Reset et mode Turbo n'existent que pour les serveurs speedrun.")
+
             if action == "reset":
                 job = RUNNER.submit("reset", lambda rep: srv.reset(rep), target=srv.id, dedupe=True)
                 return self.json({"ok": True, "job": job.as_dict()}, 202)
@@ -375,6 +385,24 @@ class Handler(BaseHTTPRequestHandler):
             if action == "settings":
                 result = srv.apply_settings(body.get("settings") or {})
                 return self.json({"ok": True, "settings": srv.get_settings(), **result})
+
+            if action == "backups":
+                op = parts[3] if len(parts) > 3 else "create"
+                if op == "create":
+                    job = RUNNER.submit("backup", lambda rep: srv.backup(rep, "manuel"), target=srv.id, dedupe=True)
+                    return self.json({"ok": True, "job": job.as_dict()}, 202)
+                name = str(body.get("name") or "")
+                if op == "restore":
+                    backups._path(srv.id, name)  # nom vérifié tout de suite, erreur lisible
+                    job = RUNNER.submit("restore", lambda rep: srv.restore(name, rep), target=srv.id, dedupe=True)
+                    return self.json({"ok": True, "job": job.as_dict()}, 202)
+                if op == "delete":
+                    try:
+                        backups.delete(srv.id, name)
+                    except ValueError as exc:
+                        return self.fail(str(exc))
+                    return self.json({"ok": True, "backups": backups.list_backups(srv.id)})
+                return self.fail("Action de sauvegarde inconnue : %s" % op)
 
             if action == "players":
                 which = body.get("list") or "whitelist"

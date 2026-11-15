@@ -33,7 +33,23 @@ local, **sans mot de passe**, réseau de confiance uniquement).
 
 ---
 
-## Le panel
+## Les panels
+
+À l'ouverture, l'accueil propose un type de partie :
+
+| Panel | Pour quoi |
+|---|---|
+| 💀 **Speedrun** | Mondes hardcore jetables : reset en un clic, mode Turbo (détails ci-dessous). |
+| 🏡 **Survie entre potes** | Un monde qui dure. « Créer un serveur » ouvre sa page complète, avec les catégories à gauche (Tableau de bord, Général, Joueurs, Sauvegardes, Avancé) : on règle tout, puis Démarrer. Pas de hardcore par défaut, écritures disque sûres, **sauvegardes automatiques** (1 h / 3 h / 6 h / 24 h, les 10 dernières gardées). Pas de reset possible. |
+| 🗺️ **Aventure & mini-jeux** | Bientôt : maps aventure et mini-jeux à installer en un clic. |
+| 🛠️ **Mes serveurs** | Tous les serveurs : état, version, place disque, dernière sauvegarde, démarrer/arrêter, sauvegarder, réglages. |
+
+**Sauvegardes** (⚙️ → Sauvegardes, ou bouton 💾 / touche <kbd>B</kbd> en survie) : archive ZIP du monde
+et de la config, faite à chaud (écritures suspendues le temps de l'archive). Restaurer remplace le
+monde actuel, qui est d'abord sauvegardé lui-même. « Nettoyer » un serveur de survie fait aussi une
+sauvegarde avant. Elles sont rangées dans `backups/`, hors du dossier du serveur.
+
+### Panel Speedrun
 
 - **RESET** (<kbd>R</kbd>) — monde neuf, config conservée. C'est *le* bouton.
 - **START** (<kbd>S</kbd>) / **STOP** (<kbd>X</kbd>)
@@ -132,7 +148,8 @@ mcpanel/               backend Python, bibliothèque standard uniquement
   deps.py              téléchargement Java (Temurin) et jar Mojang (vérifié SHA-1)
   props.py             schéma typé de server.properties
   players.py           whitelist / OP, résolution des UUID
-web/index.html         interface (un seul fichier)
+  backups.py           sauvegardes ZIP à chaud, restauration, rotation
+web/                   interface : index.html, app.css, js/ (un fichier par partie, sans build)
 packaging/             construction de l'exe Windows (PyInstaller)
 .github/workflows/     un tag vX.Y.Z construit, teste et publie l'exe dans les Releases
 servers/<nom>/         un dossier par serveur (monde, config, logs)

@@ -6,6 +6,7 @@
 # --- Données locales ----------------------------------------------------------
 # Mondes, logs, config de la machine : rien à faire dans le dépôt.
 servers/
+backups/
 .trash/
 .logs/
 panel.json
