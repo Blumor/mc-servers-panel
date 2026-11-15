@@ -13,12 +13,18 @@ automatiquement.
 
 | Système | Lancer |
 |---|---|
-| Linux / WSL / macOS | `./panel.sh` |
-| Windows | double-clic sur `PANEL.bat` |
+| **Windows** | télécharger **`MCSpeedrunPanel.exe`** dans les [Releases](https://github.com/Blumor/mc-speedrun-panel/releases/latest), le ranger dans un dossier à lui, double-clic. Rien d'autre à installer. |
+| Linux / WSL / macOS | `./panel.sh` (Python 3.9+) |
+| Windows, depuis le code source | double-clic sur `PANEL.bat`, ou `py -m mcpanel` |
 
-1. Le navigateur s'ouvre sur `http://localhost:8765/`.
+L'exe range mondes et réglages dans `mcpanel-data`, à côté de lui. Il n'est pas signé : si Windows
+affiche « Windows a protégé votre ordinateur », *Informations complémentaires* → *Exécuter quand
+même*. Avec le *Contrôle intelligent des applications* activé, Windows refuse tout exe non signé :
+passer par le code source.
+
+1. Le navigateur s'ouvre sur `http://localhost:8765/`. Fermer la fenêtre noire arrête le panel
+   et ses serveurs ; relancer l'exe alors qu'il tourne déjà rouvre juste l'onglet.
 2. **Créer mon serveur** → version, RAM, Turbo → **Créer & démarrer**.
-   (Un serveur `speedrun` en 26.3 existe déjà.)
 3. Dans Minecraft : *Multijoueur* → *Connexion directe* → `localhost`.
 4. Ton pote : l'adresse 🌐 en haut du panel (clic = copie). Voir [Jouer à deux](#jouer-à-deux).
 
@@ -127,6 +133,8 @@ mcpanel/               backend Python, bibliothèque standard uniquement
   props.py             schéma typé de server.properties
   players.py           whitelist / OP, résolution des UUID
 web/index.html         interface (un seul fichier)
+packaging/             construction de l'exe Windows (PyInstaller)
+.github/workflows/     un tag vX.Y.Z construit, teste et publie l'exe dans les Releases
 servers/<nom>/         un dossier par serveur (monde, config, logs)
   .slots/a  .slots/b   les deux serveurs du mode Turbo
 .cache/jars/           jars Minecraft partagés entre serveurs

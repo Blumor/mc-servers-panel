@@ -1,0 +1,90 @@
+name: Release Windows
+
+# Pousser un tag vX.Y.Z (égal à APP_VERSION) construit l'exe et publie la release GitHub.
+# Lancement manuel : construit et teste seulement (exe en artefact du run).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Tag = version du panel
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $version = python -c "import sys; sys.path.insert(0, '.'); from mcpanel.config import APP_VERSION; print(APP_VERSION)"
+          if ("v$version" -ne "$env:GITHUB_REF_NAME") { throw "Tag $env:GITHUB_REF_NAME, mais APP_VERSION = $version" }
+
+      - name: Installer PyInstaller
+        shell: pwsh
+        env:
+          # Chargeur compilé ici plutôt que celui fourni, partagé avec trop de malwares :
+          # moins de faux positifs antivirus.
+          PYINSTALLER_COMPILE_BOOTLOADER: "1"
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --no-binary pyinstaller "pyinstaller==6.22.3"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Compilation du chargeur impossible : chargeur précompilé."
+            python -m pip install "pyinstaller==6.22.3"
+          }
+
+      - name: Serveurs tués avec le panel (job Windows)
+        run: python packaging/ci_check_job.py
+
+      - name: Construire l'exe
+        run: python packaging/build_exe.py
+
+      - name: Test de fumée
+        shell: pwsh
+        run: |
+          $dir = New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\fumee"
+          Copy-Item dist\MCSpeedrunPanel.exe $dir
+          $exe = Join-Path $dir "MCSpeedrunPanel.exe"
+          Start-Process -FilePath $exe -ArgumentList "--no-browser", "--port", "18765" | Out-Null
+          $ping = $null
+          for ($i = 0; $i -lt 60 -and -not $ping; $i++) {
+            Start-Sleep -Seconds 1
+            try { $ping = Invoke-RestMethod -Uri "http://127.0.0.1:18765/api/ping" } catch {}
+          }
+          try {
+            if ($ping.app -ne "MC Speedrun Panel") { throw "Le panel ne répond pas" }
+            $page = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:18765/"
+            if ($page.Content -notmatch "Speedrun Panel") { throw "Interface absente de l'exe" }
+            if (-not (Test-Path (Join-Path $dir "mcpanel-data\servers"))) { throw "mcpanel-data absent à côté de l'exe" }
+            $second = Start-Process -FilePath $exe -ArgumentList "--no-browser", "--port", "18765" -PassThru -Wait
+            if ($second.ExitCode -ne 0) { throw "Second lancement : code $($second.ExitCode)" }
+            Write-Host "OK : panel $($ping.version), interface servie, données à côté de l'exe, double lancement géré"
+          } finally {
+            Stop-Process -Name MCSpeedrunPanel -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Artefact (lancement manuel)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: MCSpeedrunPanel
+          path: dist/MCSpeedrunPanel.exe
+
+      - name: Publier la release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$env:GITHUB_REF_NAME" dist/MCSpeedrunPanel.exe
+          --title "MC Speedrun Panel $env:GITHUB_REF_NAME"
+          --notes-file packaging/RELEASE_NOTES.md

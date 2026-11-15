@@ -10,10 +10,32 @@ import threading
 from pathlib import Path
 
 APP_NAME = "MC Speedrun Panel"
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.1.0"
 
-ROOT = Path(__file__).resolve().parent.parent
-WEB_DIR = ROOT / "web"
+# Exécutable (PyInstaller, un seul fichier) : le code est décompressé dans un dossier
+# temporaire effacé à la fermeture. L'interface est lue là-dedans, mais les données
+# (mondes, Java, config) vont dans « mcpanel-data » à côté de l'exe, pour survivre.
+FROZEN = bool(getattr(sys, "frozen", False))
+CODE_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
+
+
+def _data_root() -> Path:
+    if not FROZEN:
+        return CODE_ROOT  # depuis les sources : données à côté du code, comme toujours
+    beside_exe = Path(sys.executable).resolve().parent / "mcpanel-data"
+    try:
+        beside_exe.mkdir(parents=True, exist_ok=True)
+        probe = beside_exe / ".write-test"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+        return beside_exe
+    except OSError:  # exe rangé dans un dossier protégé (Program Files...) : profil utilisateur
+        base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".local" / "share")
+        return base / "MC Speedrun Panel"
+
+
+ROOT = _data_root()
+WEB_DIR = CODE_ROOT / "web"
 SERVERS_DIR = ROOT / "servers"
 CACHE_DIR = ROOT / ".cache"
 JAR_CACHE = CACHE_DIR / "jars"

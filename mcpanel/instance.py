@@ -54,6 +54,72 @@ FATAL_HINTS = (
 )
 
 
+_job_lock = threading.Lock()
+_kill_job = None  # handle du job Windows, gardé ouvert tant que le panel vit
+
+
+def attach_to_kill_job(pid: int) -> bool:
+    """Windows : rattache un processus à un job « tué à la fermeture ».
+
+    Fermer la fenêtre du panel (clic sur X, plantage) tue le panel sans lui laisser le temps
+    d'arrêter ses serveurs. Sans ça, les Java restaient orphelins et gardaient le port
+    25565 : au lancement suivant, « port déjà utilisé ». Avec le job, Windows les tue aussi.
+    """
+    if not cfg.IS_WINDOWS:
+        return False
+    global _kill_job
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class IoCounters(ctypes.Structure):
+            _fields_ = [(name, ctypes.c_ulonglong) for name in (
+                "ReadOperationCount", "WriteOperationCount", "OtherOperationCount",
+                "ReadTransferCount", "WriteTransferCount", "OtherTransferCount")]
+
+        class BasicLimits(ctypes.Structure):
+            _fields_ = [("PerProcessUserTimeLimit", ctypes.c_longlong), ("PerJobUserTimeLimit", ctypes.c_longlong),
+                        ("LimitFlags", wintypes.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                        ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wintypes.DWORD),
+                        ("Affinity", ctypes.c_size_t), ("PriorityClass", wintypes.DWORD),
+                        ("SchedulingClass", wintypes.DWORD)]
+
+        class ExtendedLimits(ctypes.Structure):
+            _fields_ = [("BasicLimitInformation", BasicLimits), ("IoInfo", IoCounters),
+                        ("ProcessMemoryLimit", ctypes.c_size_t), ("JobMemoryLimit", ctypes.c_size_t),
+                        ("PeakProcessMemoryUsed", ctypes.c_size_t), ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+        k32.CreateJobObjectW.restype = wintypes.HANDLE
+        k32.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+        k32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        k32.OpenProcess.restype = wintypes.HANDLE
+        k32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+        k32.CloseHandle.argtypes = [wintypes.HANDLE]
+
+        with _job_lock:
+            if _kill_job is None:
+                job = k32.CreateJobObjectW(None, None)
+                if not job:
+                    return False
+                limits = ExtendedLimits()
+                limits.BasicLimitInformation.LimitFlags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+                if not k32.SetInformationJobObject(job, 9, ctypes.byref(limits), ctypes.sizeof(limits)):
+                    k32.CloseHandle(job)
+                    return False
+                _kill_job = job
+        process = k32.OpenProcess(0x0100 | 0x0001, False, pid)  # PROCESS_SET_QUOTA | PROCESS_TERMINATE
+        if not process:
+            return False
+        try:
+            return bool(k32.AssignProcessToJobObject(_kill_job, process))
+        finally:
+            k32.CloseHandle(process)
+    except (OSError, AttributeError, ValueError):
+        return False  # au pire : comportement d'avant, rien ne casse
+
+
 def _flags(ram_mb: int) -> list[str]:
     """Flags JVM orientés démarrage rapide + GC court (dérivés des flags Aikar).
 
@@ -222,6 +288,7 @@ class ServerProcess:
                 self.set_state(ERROR, "Lancement impossible: %s" % exc)
                 raise
             self.proc = proc
+            attach_to_kill_job(proc.pid)
 
             self.set_state(STARTING)
             self._pump = threading.Thread(

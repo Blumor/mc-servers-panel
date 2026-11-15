@@ -209,6 +209,9 @@ class Handler(BaseHTTPRequestHandler):
         if parts == ["events"]:
             return self._sse()
 
+        if parts == ["ping"]:  # léger : sert à repérer un panel déjà lancé
+            return self.json({"ok": True, "app": cfg.APP_NAME, "version": cfg.APP_VERSION})
+
         if parts == ["system"]:
             return self.json({"ok": True, "system": system_info()})
 

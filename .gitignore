@@ -40,3 +40,8 @@ desktop.ini
 .vscode/
 .idea/
 *.swp
+
+# --- Exécutable (packaging/build_exe.py) ----------------------------------------
+build/
+dist/
+mcpanel-data/

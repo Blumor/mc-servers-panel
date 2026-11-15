@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import json
 import signal
 import sys
 import threading
 import time
+import urllib.request
 import webbrowser
 
 from . import config as cfg
@@ -39,6 +41,16 @@ def main(argv=None) -> int:
         return 0
 
     wanted = args.port or int(conf.get("panel_port") or cfg.DEFAULT_PANEL_PORT)
+    if _panel_already_running(wanted):
+        # Double-clic sur un panel déjà lancé : on rouvre l'onglet au lieu d'en démarrer un
+        # second, qui piloterait les mêmes serveurs en parallèle.
+        url = "http://localhost:%d/" % wanted
+        print("[panel] déjà ouvert sur %s" % url)
+        if not args.no_browser:
+            webbrowser.open(url)
+        if cfg.FROZEN:
+            time.sleep(2)  # laisse le temps de lire le message avant que la fenêtre se ferme
+        return 0
     port = find_panel_port(wanted)
     if port != wanted:
         print("[panel] port %d occupé, bascule sur %d" % (wanted, port))
@@ -53,7 +65,8 @@ def main(argv=None) -> int:
     if args.lan:
         print("  Sur le LAN : http://%s:%d/  (ouvert, sans mot de passe)" % (local_ip(), port))
     print("  Serveurs   : %d configuré(s)" % len(manager().servers))
-    print("  Arrêt      : Ctrl+C\n")
+    print("  Données    : %s" % cfg.ROOT)
+    print("  Arrêt      : Ctrl+C ou fermer cette fenêtre\n")
 
     if conf.get("auto_open_browser", True) and not args.no_browser:
         threading.Thread(target=_open_later, args=(url,), daemon=True).start()
@@ -81,6 +94,14 @@ def main(argv=None) -> int:
         httpd.server_close()
     print("[panel] au revoir.")
     return 0
+
+
+def _panel_already_running(port: int) -> bool:
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:%d/api/ping" % port, timeout=1.5) as resp:
+            return json.loads(resp.read().decode("utf-8")).get("app") == cfg.APP_NAME
+    except Exception:  # rien sur ce port, ou un autre programme
+        return False
 
 
 def _graceful_exit(httpd) -> None:
