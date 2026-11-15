@@ -40,9 +40,24 @@ local, **sans mot de passe**, réseau de confiance uniquement).
 | Panel | Pour quoi |
 |---|---|
 | 💀 **Speedrun** | Mondes hardcore jetables : reset en un clic, mode Turbo (détails ci-dessous). |
-| 🏡 **Survie entre potes** | Un monde qui dure. « Créer un serveur » ouvre sa page complète, avec les catégories à gauche (Tableau de bord, Général, Joueurs, Sauvegardes, Avancé) : on règle tout, puis Démarrer. Pas de hardcore par défaut, écritures disque sûres, **sauvegardes automatiques** (1 h / 3 h / 6 h / 24 h, les 10 dernières gardées). Pas de reset possible. |
+| 🏡 **Survie entre potes** | Un monde qui dure. « Créer un serveur » ouvre sa page complète, catégories à gauche : Tableau de bord, Général, Logiciel, Plugins/Mods, Modpacks, Pack de ressources, Datapacks, Joueurs, Sauvegardes, Fichiers de config, Avancé. On règle tout, puis Démarrer. **Sauvegardes automatiques**, pas de reset possible. |
 | 🗺️ **Aventure & mini-jeux** | Bientôt : maps aventure et mini-jeux à installer en un clic. |
 | 🛠️ **Mes serveurs** | Tous les serveurs : état, version, place disque, dernière sauvegarde, démarrer/arrêter, sauvegarder, réglages. |
+
+**Plugins et mods** (page d'un serveur de survie) :
+
+- **Logiciel** : Vanilla, Paper (plugins), Fabric ou NeoForge (mods), téléchargés depuis leurs sources
+  officielles. Seuls ceux qui existent pour la version choisie sont proposés. Le monde est sauvegardé
+  avant chaque changement.
+- **Plugins / Mods / Datapacks / Pack de ressources / Modpacks** : recherche dans le catalogue
+  [Modrinth](https://modrinth.com), filtrée sur la version et le logiciel du serveur. « Installer »
+  prend la bonne version, vérifie le fichier (SHA-1) et ajoute les dépendances obligatoires, y compris
+  celles que seul le fichier du mod déclare. Les mods qui ne servent qu'aux joueurs sont écartés.
+  Activer/désactiver, retirer, mises à jour. Le pack de ressources est envoyé aux joueurs à la connexion.
+- **Pack pour les joueurs** (serveurs à mods) : un `.mrpack` à importer dans Modrinth App ou Prism
+  Launcher, pour avoir les mêmes mods que le serveur. Lunar Client ne charge pas de mods.
+- **Fichiers de config** : éditeur des configs des plugins, des mods et de Paper, avec copie `.bak`.
+- Serveurs moddés : Java exactement à la version prévue par Mojang (téléchargé si besoin).
 
 **Sauvegardes** (⚙️ → Sauvegardes, ou bouton 💾 / touche <kbd>B</kbd> en survie) : archive ZIP du monde
 et de la config, faite à chaud (écritures suspendues le temps de l'archive). Restaurer remplace le
@@ -149,6 +164,9 @@ mcpanel/               backend Python, bibliothèque standard uniquement
   props.py             schéma typé de server.properties
   players.py           whitelist / OP, résolution des UUID
   backups.py           sauvegardes ZIP à chaud, restauration, rotation
+  software.py          Paper / Fabric / NeoForge : versions, téléchargement, installation
+  content.py           Modrinth : recherche, installation, dépendances, modpacks, pack joueurs
+  files.py             éditeur des fichiers de config
 web/                   interface : index.html, app.css, js/ (un fichier par partie, sans build)
 packaging/             construction de l'exe Windows (PyInstaller)
 .github/workflows/     un tag vX.Y.Z construit, teste et publie l'exe dans les Releases

@@ -51,6 +51,8 @@ FATAL_HINTS = (
     ("Invalid or corrupt jarfile", "Le server.jar est corrompu. Il sera re-téléchargé."),
     ("Could not reserve enough space", "RAM demandée trop élevée pour ce système. Réduisez l'allocation."),
     ("Failed to start the minecraft server", "Le serveur n'a pas démarré, consultez la console ci-dessous."),
+    ("Incompatible mods found", "Mods incompatibles ou dépendance manquante : la console indique quoi installer ou retirer."),
+    ("Missing or unsupported mandatory dependencies", "Dépendance de mod manquante : la console indique laquelle."),
 )
 
 
@@ -267,7 +269,9 @@ class ServerProcess:
             self.port = port
             self.started_at = time.time()
 
-            cmd = [java_bin] + _flags(ram_mb) + list(extra_args or []) + ["-jar", str(jar), "nogui"]
+            # jar : chemin du jar, ou arguments de lancement tout prêts (NeoForge : « @…/unix_args.txt »).
+            launch = list(jar) if isinstance(jar, (list, tuple)) else ["-jar", str(jar)]
+            cmd = [java_bin] + _flags(ram_mb) + list(extra_args or []) + launch + ["nogui"]
             self.emit_line("[panel] %s" % " ".join([Path(cmd[0]).name] + cmd[1:][-4:]), "panel")
 
             popen_kwargs = {

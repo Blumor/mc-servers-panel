@@ -125,7 +125,7 @@ function renderSurvivalList(){
     const head = el('span', 'ticon', '🏡');
     const players = (s.live || {}).player_count || 0;
     card.append(head, el('b', '', s.name),
-      el('span', '', (s.version === '?' ? 'Dernière version' : 'Minecraft ' + s.version) + ' · ' + players + ' joueur(s)'),
+      el('span', '', (SOFTWARE_LABEL[s.software] || 'Vanilla') + ' · ' + (s.version === '?' ? 'dernière version' : 'Minecraft ' + s.version) + ' · ' + players + ' joueur(s)'),
       el('em', '', stateLabel));
     box.append(card);
   });
@@ -147,10 +147,18 @@ async function createSurvival(){
 const PAGE_CATS = [
   ['dashboard', '📊', 'Tableau de bord'],
   ['general', '⚙️', 'Général'],
+  ['software', '🧩', 'Logiciel'],
+  ['content', '🔌', 'Plugins & mods'],
+  ['modpacks', '🎁', 'Modpacks'],
+  ['resourcepack', '🎨', 'Pack de ressources'],
+  ['datapacks', '📦', 'Datapacks'],
   ['players', '👥', 'Joueurs'],
   ['backups', '💾', 'Sauvegardes'],
+  ['files', '📝', 'Fichiers de config'],
   ['advanced', '🧪', 'Avancé'],
 ];
+const SOFTWARE_LABEL = {vanilla: 'Vanilla', paper: 'Paper', fabric: 'Fabric', neoforge: 'NeoForge'};
+const contentLabel = (sw) => sw === 'paper' ? 'Plugins' : (sw === 'fabric' || sw === 'neoforge') ? 'Mods' : 'Plugins & mods';
 const pageHash = (id, cat) => '#/serveur/' + encodeURIComponent(id) + (cat ? '/' + cat : '');
 let pageNavSig = '';
 $('srvpage').classList.add('page-mode');
@@ -169,18 +177,19 @@ function renderServerPage(){
   $('pgState').className = 'state-pill ' + cls;
   $('pgState').replaceChildren(el('span', 'dot ' + dotClass(s.state)), el('span', '', lab));
   $('pgName').textContent = s.name;
-  $('pgMeta').textContent = 'Survie · ' + (s.version === '?' ? 'dernière version' : 'Minecraft ' + s.version) + ' · port ' + s.port;
+  $('pgMeta').textContent = 'Survie · ' + (SOFTWARE_LABEL[s.software] || 'Vanilla') + ' · ' +
+    (s.version === '?' ? 'dernière version' : 'Minecraft ' + s.version) + ' · port ' + s.port;
   setChip('pgAddr', '📋', s.address);
   const up = s.state === 'running', busy = ['starting','stopping','resetting','installing'].includes(s.state);
   $('pgStart').disabled = up || busy;
   $('pgStop').disabled = (!up && s.state !== 'error') || busy;
   $('pgBackup').disabled = busy;
-  const sig = s.id + '|' + S.pageCat;
+  const sig = s.id + '|' + S.pageCat + '|' + s.software;
   if (sig !== pageNavSig){
     pageNavSig = sig;
     const nav = $('pgNav'); nav.innerHTML = '';
     PAGE_CATS.forEach(([cat, icon, label]) => {
-      const a = el('a', cat === S.pageCat ? 'on' : '', icon + '  ' + label);
+      const a = el('a', cat === S.pageCat ? 'on' : '', icon + '  ' + (cat === 'content' ? contentLabel(s.software) : label));
       a.href = pageHash(s.id, cat);
       nav.append(a);
     });
@@ -196,6 +205,9 @@ async function loadPageCategory(cat){
   if (cat === 'general') return fillGeneral(s);
   if (cat === 'players'){ $('catPlayers').append($('panePlayers')); return loadPlayers(s.id); }
   if (cat === 'backups'){ $('catBackups').append($('paneBackups')); return loadBackups(s.id); }
+  if (cat === 'software') return openSoftwarePage(s);
+  if (['content', 'modpacks', 'resourcepack', 'datapacks'].includes(cat)) return openContentPage(s, cat);
+  if (cat === 'files') return openFilesPage(s);
   if (cat === 'advanced'){
     $('advSlot').append($('paneProps'));
     $('sPropSearch').value = '';

@@ -10,7 +10,7 @@ import threading
 from pathlib import Path
 
 APP_NAME = "MC Speedrun Panel"
-APP_VERSION = "2.1.0"
+APP_VERSION = "2.2.0"
 
 # Exécutable (PyInstaller, un seul fichier) : le code est décompressé dans un dossier
 # temporaire effacé à la fermeture. L'interface est lue là-dedans, mais les données

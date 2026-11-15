@@ -299,12 +299,15 @@ def _safe_extract_tar(tf: tarfile.TarFile, dest: Path) -> None:
         tf.extractall(dest)
 
 
-def ensure_java(mc_version: str, on_progress=None) -> str:
-    """Garantit un Java compatible avec la version Minecraft. Installe si absent."""
+def ensure_java(mc_version: str, on_progress=None, exact: bool = False) -> str:
+    """Garantit un Java compatible avec la version Minecraft. Installe si absent.
+
+    exact : exactement la version visée par Mojang (serveurs moddés : un mod avec du code
+    natif, comme le profileur de spark, peut planter sur un Java plus récent)."""
     needed = cfg.required_java(mc_version)
     # Avant la 1.17, Mojang vise Java 8 (son launcher l'embarque) : on s'y tient, même si
     # un Java plus récent est installé, plutôt que de risquer un plantage au démarrage.
-    found = find_java(needed, maximum=8 if needed == 8 else None)
+    found = find_java(needed, maximum=needed if (exact or needed == 8) else None)
     if found:
         return found
     return install_java(needed, on_progress=on_progress)

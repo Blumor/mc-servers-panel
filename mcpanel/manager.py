@@ -11,7 +11,7 @@ import uuid
 from pathlib import Path
 
 from . import config as cfg
-from . import backups, deps, players, props
+from . import backups, content, deps, players, props, software
 from .bus import BUS
 from .instance import ERROR, RESETTING, RUNNING, STARTING, STOPPED, ServerProcess
 from .jobs import RUNNER
@@ -133,6 +133,7 @@ DEFAULT_META = {
     "resets": 0,
     "best_boot": None,
     "kind": "speedrun",          # speedrun | survival : décide du panel, des défauts, du reset
+    "software": "vanilla",       # vanilla | paper | fabric | neoforge (survie uniquement)
     "auto_backup_hours": 0,      # 0 = pas de sauvegarde automatique
     "last_backup": None,
 }
@@ -155,6 +156,7 @@ class ManagedServer:
         self._java: str | None = None
         self._jar: Path | None = None
         self._jvm_args: list[str] = []          # correctif Log4Shell selon la version
+        self._launch: list[str] | None = None    # arguments Paper / Fabric / NeoForge (None = jar vanilla)
         self._log4j_file: Path | None = None
         self._uuid_lock = threading.Lock()
 
@@ -253,7 +255,7 @@ class ManagedServer:
         def do_java():
             try:
                 results["java"] = deps.ensure_java(
-                    version,
+                    version, exact=self.software != "vanilla",
                     on_progress=lambda p: say(
                         p.get("message", ""),
                         (p["done"] / p["total"] * 0.45) if p.get("total") else None,
@@ -264,6 +266,10 @@ class ManagedServer:
 
         def do_jar():
             try:
+                if self.software != "vanilla":  # Paper/Fabric/NeoForge récupèrent eux-mêmes le jeu
+                    results["jar"] = ""
+                    results["log4j"] = deps.log4j_fix(version)
+                    return
                 results["jar"] = deps.ensure_server_jar(
                     version,
                     on_progress=lambda p: say(
@@ -293,8 +299,17 @@ class ManagedServer:
             raise RuntimeError(" | ".join(errors))
 
         self._java = str(results["java"])
-        self._jar = Path(str(results["jar"]))
+        self._jar = Path(str(results["jar"])) if results["jar"] else None
         self._jvm_args, self._log4j_file = results["log4j"]
+        self._launch = None
+        if self.software != "vanilla":
+            self._launch, loader = software.prepare(self.software, version, self.dir, self._java, say,
+                                                    pinned=self.meta.get("loader_pin"))
+            self.meta["loader_version"] = loader
+            self.save()
+            if self.software in ("paper", "neoforge"):
+                # Paper corrige lui-même Log4Shell, NeoForge n'existe qu'après la faille.
+                self._jvm_args, self._log4j_file = [], None
         self.deps_ready = True
         say("Dépendances prêtes", 0.96)
         return self._java, self._jar
@@ -350,7 +365,7 @@ class ManagedServer:
         """Démarre un slot et réessaie une fois si la panne est réparable."""
         for attempt in (0, 1):
             self.prepare_dir(proc.workdir, port, fresh_seed=fresh_seed)
-            proc.start(self._java, self._jar, ram, port, extra_args=self._jvm_args)
+            proc.start(self._java, self._launch or self._jar, ram, port, extra_args=self._jvm_args)
             if proc.wait_ready(timeout):
                 return ram
             fixed, ram = self._try_fix(proc, ram, report)
@@ -711,6 +726,32 @@ class ManagedServer:
         return self.meta.get("kind") if self.meta.get("kind") in KINDS else "speedrun"
 
     @property
+    def software(self) -> str:
+        sw = self.meta.get("software")
+        return sw if sw in software.SOFTWARE and self.kind == "survival" else "vanilla"
+
+    def set_software(self, name: str, report=None) -> dict:
+        """Change de logiciel (serveur arrêté). Le monde est sauvegardé avant : retirer des mods peut l'abîmer."""
+        if self.kind != "survival":
+            raise RuntimeError("Plugins et mods sont réservés aux serveurs de survie.")
+        if name not in software.SOFTWARE:
+            raise ValueError("Logiciel inconnu : %s" % name)
+        if self.live.alive:
+            raise RuntimeError("Arrête le serveur avant de changer de logiciel.")
+        version = self.resolve_version()
+        if not software.availability(version).get(name):
+            raise RuntimeError("%s n'existe pas pour Minecraft %s." % (software.SOFTWARE[name]["label"], version))
+        if name != self.software and self.world_dirs(self.dir):
+            self.backup(report, "avant-logiciel")
+        if name != self.meta.get("software"):
+            self.meta.pop("loader_pin", None)  # version de loader imposée par un modpack : plus valable
+        self.meta["software"] = name
+        self.deps_ready = False
+        self.save()
+        BUS.emit("server", self.snapshot())
+        return {"software": name}
+
+    @property
     def turbo_enabled(self) -> bool:
         return bool(self.meta.get("turbo")) and self.kind == "speedrun"
 
@@ -859,6 +900,8 @@ class ManagedServer:
             "settings": {k: settings.get(k, "") for k in SNAPSHOT_KEYS if k in settings},
             "deps_ready": self.deps_ready,
             "kind": self.kind,
+            "software": self.software,
+            "modpack": self.meta.get("modpack"),
             "auto_backup_hours": self.meta.get("auto_backup_hours") or 0,
             "last_backup": self.meta.get("last_backup"),
         }
@@ -978,6 +1021,13 @@ class Manager:
         et ceux qui n'ont pas pu s'appliquer à chaud."""
         srv = self.get(sid)
         if "version" in patch and patch["version"] != srv.meta.get("version"):
+            target = patch["version"] or deps.latest_release()
+            if srv.software != "vanilla" and not software.availability(target).get(srv.software):
+                raise ValueError("%s n'existe pas pour Minecraft %s : repasse en Vanilla ou choisis une autre version."
+                                 % (software.SOFTWARE[srv.software]["label"], target))
+            if srv.world_dirs(srv.dir) and srv.kind == "survival":
+                srv.backup(None, "avant-version")  # changer de version peut transformer le monde
+            srv.meta.pop("loader_pin", None)
             srv.deps_ready = False  # sinon un reset relancerait l'ancien jar
         allowed = ("name", "version", "ram_mb", "port", "seed", "seed_mode")
         if "auto_backup_hours" in patch:

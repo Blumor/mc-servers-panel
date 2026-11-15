@@ -219,6 +219,7 @@ function onJob(job){
     jobBar.style.width = '100%';
     clearTimeout(jobHideTimer);
     jobHideTimer = setTimeout(()=>{ jobBar.style.width='0%'; }, 450);
+    if (job.kind === 'content') onContentJob(job);
     if (job.kind === 'backup' || job.kind === 'restore'){
       S.usage[job.target] = null; manageSig = '';
       if ($('scrimSet').classList.contains('on') && cur() && cur().id === job.target) loadBackups(job.target);

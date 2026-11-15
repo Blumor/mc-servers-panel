@@ -16,7 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import config as cfg
-from . import backups, deps, props
+from . import backups, content, deps, files, props, software
 from .bus import BUS
 from .jobs import RUNNER
 from .manager import local_ip, manager, port_busy
@@ -224,6 +224,11 @@ class Handler(BaseHTTPRequestHandler):
                 "versions": deps.list_versions(kind, limit),
             })
 
+        if parts == ["software"]:
+            version = (query.get("version") or [""])[0] or deps.latest_release()
+            return self.json({"ok": True, "version": version, "available": software.availability(version),
+                              "labels": {k: v["label"] for k, v in software.SOFTWARE.items()}})
+
         if parts == ["ip"]:
             return self.json({"ok": True, "local": local_ip(), "public": public_ip()})
 
@@ -261,6 +266,28 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json({"ok": True, "backups": backups.list_backups(srv.id)})
             if parts[2] == "usage":
                 return self.json({"ok": True, **srv.usage()})
+            if parts[2] == "content":
+                sub = parts[3] if len(parts) > 3 else ""
+                if sub == "search":
+                    return self.json({"ok": True, **content.search(
+                        srv, (query.get("type") or [""])[0], (query.get("q") or [""])[0],
+                        int((query.get("offset") or ["0"])[0]))})
+                if sub == "updates":
+                    return self.json({"ok": True, "updates": content.updates(srv)})
+                return self.json({"ok": True, "software": srv.software, "content_type": content.content_type(srv),
+                                  "items": content.load(srv), "modpack": srv.meta.get("modpack")})
+            if parts[2] == "client-pack":
+                data = content.client_pack(srv)
+                name = "%s-joueurs.mrpack" % srv.id
+                return self._send(200, data, "application/x-modrinth-modpack+zip",
+                                  extra={"Content-Disposition": 'attachment; filename="%s"' % name})
+            if parts[2] == "files":
+                return self.json({"ok": True, "files": files.list_files(srv)})
+            if parts[2] == "file":
+                try:
+                    return self.json({"ok": True, "text": files.read_file(srv, (query.get("path") or [""])[0])})
+                except ValueError as exc:
+                    return self.fail(str(exc))
 
         raise KeyError("Route inconnue: %s" % path)
 
@@ -385,6 +412,34 @@ class Handler(BaseHTTPRequestHandler):
             if action == "settings":
                 result = srv.apply_settings(body.get("settings") or {})
                 return self.json({"ok": True, "settings": srv.get_settings(), **result})
+
+            if action == "software":
+                return self.json({"ok": True, **srv.set_software(str(body.get("software") or ""))})
+
+            if action == "content":
+                op = parts[3] if len(parts) > 3 else ""
+                pid, ctype = str(body.get("project_id") or ""), str(body.get("type") or "")
+                if op in ("install", "update"):
+                    if ctype == "modpack" and srv.live.alive:
+                        return self.fail("Arrête le serveur avant d'installer un modpack.")
+                    job = RUNNER.submit("content", lambda rep: content.install(srv, pid, ctype, rep), target=srv.id)
+                    return self.json({"ok": True, "job": job.as_dict()}, 202)
+                try:
+                    if op == "remove":
+                        return self.json({"ok": True, "items": content.remove(srv, pid)})
+                    if op == "option":
+                        return self.json({"ok": True, "items": content.set_option(
+                            srv, pid, enabled=body.get("enabled"), required=body.get("required"))})
+                except ValueError as exc:
+                    return self.fail(str(exc))
+                return self.fail("Action inconnue : %s" % op)
+
+            if action == "file":
+                try:
+                    files.write_file(srv, str(body.get("path") or ""), str(body.get("text") or ""))
+                except ValueError as exc:
+                    return self.fail(str(exc))
+                return self.json({"ok": True})
 
             if action == "backups":
                 op = parts[3] if len(parts) > 3 else "create"

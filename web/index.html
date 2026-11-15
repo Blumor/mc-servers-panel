@@ -133,6 +133,28 @@
             <button class="btn sm danger" id="gDelete">🗑 Supprimer le serveur</button>
           </div>
         </div></div>
+        <div class="cat card" data-cat="software"><div class="card-b">
+          <h3 class="cattitle">Logiciel</h3>
+          <div class="hint" style="margin:-6px 0 16px">Choisis ce que le serveur fait tourner. Serveur arrêté ; le monde est sauvegardé avant chaque changement.</div>
+          <div class="swgrid" id="swGrid"></div>
+        </div></div>
+        <div class="cat card" data-cat="content"><div class="card-b" id="catContent"></div></div>
+        <div class="cat card" data-cat="modpacks"><div class="card-b" id="catModpacks"></div></div>
+        <div class="cat card" data-cat="resourcepack"><div class="card-b" id="catResourcepack"></div></div>
+        <div class="cat card" data-cat="datapacks"><div class="card-b" id="catDatapacks"></div></div>
+        <div class="cat card" data-cat="files"><div class="card-b">
+          <h3 class="cattitle">Fichiers de config</h3>
+          <div class="hint" style="margin:-6px 0 14px">Configs des plugins, des mods et de Paper. Arrête le serveur avant de modifier :
+            certains plugins réécrivent leur fichier en s'arrêtant. L'ancienne version est gardée en « .bak ».</div>
+          <div class="fgrid">
+            <div class="flist" id="fileList"></div>
+            <div class="fedit">
+              <div class="fpath" id="filePath">Choisis un fichier à gauche.</div>
+              <textarea id="fileText" spellcheck="false" disabled></textarea>
+              <div class="pagefoot"><button class="btn" id="fileSave" disabled>Enregistrer le fichier</button></div>
+            </div>
+          </div>
+        </div></div>
         <div class="cat card" data-cat="players"><div class="card-b" id="catPlayers"><h3 class="cattitle">Joueurs</h3></div></div>
         <div class="cat card" data-cat="backups"><div class="card-b" id="catBackups"><h3 class="cattitle">Sauvegardes</h3></div></div>
         <div class="cat card" data-cat="advanced"><div class="card-b" id="catAdvanced"><h3 class="cattitle">Avancé — server.properties</h3>
@@ -408,6 +430,7 @@
 <script src="js/create.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/views.js"></script>
+<script src="js/content.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
