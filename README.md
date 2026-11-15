@@ -41,12 +41,8 @@ Toutes les versions de Minecraft Java depuis la 1.2.5 · Windows, Linux, macOS, 
 2. Range-le dans un dossier à lui (ex. `Documents\MC Servers Panel`), puis double-clic.
 3. Le navigateur s'ouvre sur `http://localhost:8765/`.
 
-Laisse la fenêtre noire ouverte : la fermer arrête le panel **et** tous ses serveurs. Relancer l'exe
+Laisse le terminal ouvert : le fermer arrête le panel **et** tous ses serveurs. Relancer l'exe
 alors qu'il tourne déjà rouvre juste l'onglet.
-
-**Tu avais `MCSpeedrunPanel.exe`** (versions 2.2 et avant, quand le projet s'appelait MC Speedrun
-Panel) : pose `MCServersPanel.exe` dans le même dossier et supprime l'ancien. Le dossier
-`mcpanel-data` est repris tel quel : serveurs, mondes et sauvegardes sont conservés.
 
 L'exe n'est pas signé numériquement (le certificat coûte cher chaque année) :
 
