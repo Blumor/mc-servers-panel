@@ -397,7 +397,8 @@ kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--stroke-2);bo
     </div>
     <div class="pillbar">
       <div class="chip" id="chipConn"><span class="dot" id="dotConn"></span><span>Hors ligne</span></div>
-      <div class="chip click" id="chipIp" title="Copier l'adresse pour ton pote">🌐 <b>—</b></div>
+      <div class="chip click" id="chipIp" title="IP locale (même réseau) — cliquer pour copier">🏠 <b>—</b></div>
+      <div class="chip click" id="chipPub" title="IP publique à donner à ton pote (port à ouvrir sur la box) — cliquer pour copier">🌐 <b>…</b></div>
       <div class="chip" id="chipJava">☕ <b>—</b></div>
       <button class="btn sm ghost" id="btnNew">＋ Serveur</button>
       <button class="btn sm ghost icon" id="btnSettings" title="Réglages">⚙️</button>
@@ -774,7 +775,8 @@ function renderSystem(){
   const sys = S.system || {};
   const jv = sys.java_best;
   $('chipJava').innerHTML = '☕ <b>' + (jv ? 'Java '+jv : 'auto') + '</b>';
-  $('chipIp').innerHTML = '🌐 <b>' + (sys.local_ip || '—') + '</b>';
+  $('chipIp').innerHTML = '🏠 <b>' + (sys.local_ip || '—') + '</b>';
+  if (S.publicIp) $('chipPub').innerHTML = '🌐 <b>' + S.publicIp + '</b>';
   const ram = Math.max(2048, Math.min(16384, (sys.ram_total_mb||8192)));
   $('fRam').max = ram; $('sRam').max = ram;
   $('fRamHint').textContent = 'RAM détectée : ' + ((sys.ram_total_mb||0)/1024).toFixed(1) + ' Go — conseillé ' +
@@ -896,6 +898,7 @@ $('btnAuto').onclick = ()=>{ S.autoscroll = !S.autoscroll; $('btnAuto').style.op
   if (S.autoscroll) consoleBox.scrollTop = consoleBox.scrollHeight; };
 $('btnClear').onclick = ()=>{ consoleBox.innerHTML=''; S.lines=0; };
 $('chipIp').onclick = ()=> copy(S.system.local_ip || 'localhost', 'IP locale');
+$('chipPub').onclick = ()=>{ const s=cur(); if(S.publicIp) copy(S.publicIp+(s && s.port!==25565 ? ':'+s.port : ''), 'Adresse pour ton pote'); };
 $('chipAddr').onclick = ()=>{ const s=cur(); if(s) copy(s.address, 'Adresse serveur'); };
 
 /* commandes */
@@ -1287,7 +1290,13 @@ setInterval(() => {
   $('timer').textContent = fmtDur(s.run_seconds + (drift > 0 && drift < 5 ? drift : 0));
 }, 250);
 
-refresh(); connect();
+async function loadPublicIp(){
+  try { const r = await API.get('/api/ip'); S.publicIp = r.public; }
+  catch(e){ S.publicIp = null; }
+  $('chipPub').innerHTML = '🌐 <b>' + (S.publicIp || 'hors ligne') + '</b>';
+}
+
+refresh(); connect(); loadPublicIp();
 </script>
 </body>
 </html>

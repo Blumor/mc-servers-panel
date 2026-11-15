@@ -9,11 +9,8 @@ servers/
 .trash/
 .logs/
 panel.json
-server.conf
-.server.pid
-.launch.cmd
 
-# --- Serveur lancé à la racine (usage server.bat sans le panel) ---------------
+# --- Fichiers Minecraft si un serveur est lancé à la racine par erreur ----------
 world/
 world_*/
 logs/

@@ -33,6 +33,7 @@ IS_MAC = sys.platform == "darwin"
 
 # Java requis selon la version Minecraft (seuils officiels Mojang).
 JAVA_MATRIX = (
+    ((26, 0, 0), 25),  # numérotation annuelle (26.1, 26.2...) : Java 25
     ((1, 20, 5), 21),
     ((1, 18, 0), 17),
     ((1, 17, 0), 16),
@@ -150,9 +151,9 @@ def parse_mc_version(version: str) -> tuple:
 
 def required_java(mc_version: str) -> int:
     if not mc_version or mc_version[0].isalpha():
-        return 21
+        return 25
     v = parse_mc_version(mc_version)
     for threshold, java in JAVA_MATRIX:
         if v >= threshold:
             return java
-    return 21
+    return 25

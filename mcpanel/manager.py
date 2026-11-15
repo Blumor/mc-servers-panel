@@ -20,7 +20,7 @@ from .proxy import TurboProxy
 SLOT_A, SLOT_B = "a", "b"
 MAIN = "main"
 # Ordre d'essai quand la JVM installée est trop ancienne pour le jar.
-JAVA_LADDER = (21, 25, 17, 8)
+JAVA_LADDER = (17, 21, 25)
 
 # Réglages que Minecraft accepte de changer sans redémarrer, via la console.
 LIVE_COMMANDS = {
@@ -521,6 +521,8 @@ class ManagedServer:
     def _swap(self, standby: ServerProcess, java: str, jar: Path, ram: int, report=None) -> dict:
         """Bascule instantanée sur le serveur de secours déjà chargé."""
         old = self.live
+        # L'ancien monde part au recyclage : il ne doit pas passer pour un remplaçant prêt.
+        old.set_state(RESETTING)
         if report:
             report("Bascule sur le monde préchargé...", 0.6)
         self.proxy.set_backend(standby.port, drop=True)
