@@ -119,7 +119,8 @@ def purge_trash() -> None:
         threading.Thread(target=shutil.rmtree, args=(child,), kwargs={"ignore_errors": True}, daemon=True).start()
 
 
-KINDS = ("speedrun", "survival")
+KINDS = ("speedrun", "survival", "adventure")
+MODDABLE = ("survival", "adventure")  # plugins, mods, contenu Modrinth ; monde gardé (jamais de reset)
 
 DEFAULT_META = {
     "name": "Speedrun",
@@ -132,8 +133,8 @@ DEFAULT_META = {
     "created": 0.0,
     "resets": 0,
     "best_boot": None,
-    "kind": "speedrun",          # speedrun | survival : décide du panel, des défauts, du reset
-    "software": "vanilla",       # vanilla | paper | fabric | neoforge (survie uniquement)
+    "kind": "speedrun",          # speedrun | survival | adventure : décide du panel, des défauts, du reset
+    "software": "vanilla",       # vanilla | paper | fabric | neoforge (survie et aventure)
     "auto_backup_hours": 0,      # 0 = pas de sauvegarde automatique
     "last_backup": None,
 }
@@ -412,7 +413,7 @@ class ManagedServer:
         self._sync_player_uuids()
         path.mkdir(parents=True, exist_ok=True)
         (path / "eula.txt").write_text(
-            "#Accepte via MC Speedrun Panel\neula=true\n", encoding="utf-8"
+            "#Accepte via MC Servers Panel\neula=true\n", encoding="utf-8"
         )
         overrides = {"server-port": port, "query.port": port}
         if fresh_seed:
@@ -728,12 +729,12 @@ class ManagedServer:
     @property
     def software(self) -> str:
         sw = self.meta.get("software")
-        return sw if sw in software.SOFTWARE and self.kind == "survival" else "vanilla"
+        return sw if sw in software.SOFTWARE and self.kind in MODDABLE else "vanilla"
 
     def set_software(self, name: str, report=None) -> dict:
         """Change de logiciel (serveur arrêté). Le monde est sauvegardé avant : retirer des mods peut l'abîmer."""
-        if self.kind != "survival":
-            raise RuntimeError("Plugins et mods sont réservés aux serveurs de survie.")
+        if self.kind not in MODDABLE:
+            raise RuntimeError("Plugins et mods sont réservés aux serveurs de survie et d'aventure.")
         if name not in software.SOFTWARE:
             raise ValueError("Logiciel inconnu : %s" % name)
         if self.live.alive:
@@ -902,6 +903,7 @@ class ManagedServer:
             "kind": self.kind,
             "software": self.software,
             "modpack": self.meta.get("modpack"),
+            "map": self.meta.get("map"),
             "auto_backup_hours": self.meta.get("auto_backup_hours") or 0,
             "last_backup": self.meta.get("last_backup"),
         }
@@ -1025,7 +1027,7 @@ class Manager:
             if srv.software != "vanilla" and not software.availability(target).get(srv.software):
                 raise ValueError("%s n'existe pas pour Minecraft %s : repasse en Vanilla ou choisis une autre version."
                                  % (software.SOFTWARE[srv.software]["label"], target))
-            if srv.world_dirs(srv.dir) and srv.kind == "survival":
+            if srv.world_dirs(srv.dir) and srv.kind in MODDABLE:
                 srv.backup(None, "avant-version")  # changer de version peut transformer le monde
             srv.meta.pop("loader_pin", None)
             srv.deps_ready = False  # sinon un reset relancerait l'ancien jar

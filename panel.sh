@@ -18,5 +18,5 @@ if [ -z "$PY" ]; then
   exit 1
 fi
 
-echo "MC Speedrun Panel — http://localhost:8765/"
+echo "MC Servers Panel — http://localhost:8765/"
 exec "$PY" -m mcpanel "$@"

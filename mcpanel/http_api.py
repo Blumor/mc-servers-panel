@@ -16,7 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import config as cfg
-from . import backups, content, deps, files, props, software
+from . import backups, content, deps, files, maps, props, software
 from .bus import BUS
 from .jobs import RUNNER
 from .manager import local_ip, manager, port_busy
@@ -170,6 +170,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         parsed = urllib.parse.urlparse(self.path)
         try:
+            parts = [p for p in parsed.path.split("/") if p]
+            if len(parts) == 5 and parts[:2] == ["api", "servers"] and parts[3:] == ["map", "upload"]:
+                return self._map_upload(parts[2], urllib.parse.parse_qs(parsed.query))
             self._api_post(parsed.path, self.body_json())
         except KeyError as exc:
             self.fail(str(exc), 404)
@@ -211,6 +214,9 @@ class Handler(BaseHTTPRequestHandler):
 
         if parts == ["ping"]:  # léger : sert à repérer un panel déjà lancé
             return self.json({"ok": True, "app": cfg.APP_NAME, "version": cfg.APP_VERSION})
+
+        if parts == ["maps"]:
+            return self.json({"ok": True, **maps.catalog()})
 
         if parts == ["system"]:
             return self.json({"ok": True, "system": system_info()})
@@ -271,7 +277,7 @@ class Handler(BaseHTTPRequestHandler):
                 if sub == "search":
                     return self.json({"ok": True, **content.search(
                         srv, (query.get("type") or [""])[0], (query.get("q") or [""])[0],
-                        int((query.get("offset") or ["0"])[0]))})
+                        int((query.get("offset") or ["0"])[0]), category=(query.get("category") or [""])[0])})
                 if sub == "updates":
                     return self.json({"ok": True, "updates": content.updates(srv)})
                 return self.json({"ok": True, "software": srv.software, "content_type": content.content_type(srv),
@@ -281,6 +287,15 @@ class Handler(BaseHTTPRequestHandler):
                 name = "%s-joueurs.mrpack" % srv.id
                 return self._send(200, data, "application/x-modrinth-modpack+zip",
                                   extra={"Content-Disposition": 'attachment; filename="%s"' % name})
+            if parts[2] == "map":
+                if len(parts) > 3 and parts[3] == "resources":
+                    pack = maps.resource_pack(srv)
+                    if not pack:
+                        return self.fail("Cette map n'a pas de pack de ressources.", 404)
+                    return self._send(200, pack.read_bytes(), "application/zip", extra={
+                        "Content-Disposition": 'attachment; filename="%s-ressources.zip"' % srv.id})
+                return self.json({"ok": True, "map": srv.meta.get("map"), "original": maps.original_backup(srv),
+                                  "resource_pack": bool(maps.resource_pack(srv))})
             if parts[2] == "files":
                 return self.json({"ok": True, "files": files.list_files(srv)})
             if parts[2] == "file":
@@ -434,6 +449,23 @@ class Handler(BaseHTTPRequestHandler):
                     return self.fail(str(exc))
                 return self.fail("Action inconnue : %s" % op)
 
+            if action == "map":
+                op = parts[3] if len(parts) > 3 else ""
+                if op == "install":
+                    source = {k: str(body.get(k) or "") for k in ("id", "url", "title", "category")}
+                    if source["id"]:
+                        maps.find(source["id"])  # erreur lisible tout de suite
+                    elif not source["url"]:
+                        return self.fail("Choisis une map du catalogue ou colle un lien.")
+                    if srv.live.alive:
+                        return self.fail("Arrête le serveur avant de changer de map.")
+                    job = RUNNER.submit("map", lambda rep: maps.install_from(srv, source, rep), target=srv.id, dedupe=True)
+                    return self.json({"ok": True, "job": job.as_dict()}, 202)
+                if op == "restart":
+                    job = RUNNER.submit("map-restart", lambda rep: maps.restart(srv, rep), target=srv.id, dedupe=True)
+                    return self.json({"ok": True, "job": job.as_dict()}, 202)
+                return self.fail("Action inconnue : %s" % op)
+
             if action == "file":
                 try:
                     files.write_file(srv, str(body.get("path") or ""), str(body.get("text") or ""))
@@ -472,6 +504,40 @@ class Handler(BaseHTTPRequestHandler):
                     return self.fail(str(exc))
 
         raise KeyError("Route inconnue: %s" % path)
+
+    def _map_upload(self, sid: str, query: dict) -> None:
+        """Map envoyée par le navigateur : corps brut de la requête = le fichier ZIP."""
+        srv = manager().get(sid)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = 0
+        if srv.kind != "adventure" or srv.live.alive or length <= 0 or length > maps.MAX_ARCHIVE:
+            # Corps non lu : la connexion est fermée plutôt que réutilisée.
+            reason = ("Les maps s'installent sur un serveur Aventure & mini-jeux." if srv.kind != "adventure"
+                      else "Arrête le serveur avant de changer de map." if srv.live.alive
+                      else "Fichier vide." if length <= 0 else "Fichier trop gros (2 Go max).")
+            return self._send(400, json.dumps({"ok": False, "error": reason}).encode("utf-8"),
+                              extra={"Connection": "close"})
+        name = (query.get("name") or ["map.zip"])[0]
+        title = Path(name.replace("\\", "/")).stem[:60] or "Map importée"
+        category = (query.get("category") or ["aventure"])[0]
+        archive = maps.uploads_dir() / ("%s-%d.zip" % (srv.id, int(time.time() * 1000)))
+        try:
+            maps.receive_upload(self.rfile, length, archive)
+        except ValueError as exc:
+            self.close_connection = True
+            return self.fail(str(exc))
+        source = {"title": title, "origin": "import", "category": category}
+
+        def job(rep):
+            try:
+                return maps.install(srv, archive, source, rep)
+            finally:
+                archive.unlink(missing_ok=True)
+
+        submitted = RUNNER.submit("map", job, target=srv.id)  # pas de dedupe : chaque envoi a son fichier
+        return self.json({"ok": True, "job": submitted.as_dict()}, 202)
 
     # -------------------------------------------------------------------- SSE
     def _sse(self) -> None:

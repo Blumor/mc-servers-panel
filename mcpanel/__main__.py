@@ -99,7 +99,7 @@ def main(argv=None) -> int:
 def _panel_already_running(port: int) -> bool:
     try:
         with urllib.request.urlopen("http://127.0.0.1:%d/api/ping" % port, timeout=1.5) as resp:
-            return json.loads(resp.read().decode("utf-8")).get("app") == cfg.APP_NAME
+            return json.loads(resp.read().decode("utf-8")).get("app") in (cfg.APP_NAME, *cfg.OLD_APP_NAMES)
     except Exception:  # rien sur ce port, ou un autre programme
         return False
 

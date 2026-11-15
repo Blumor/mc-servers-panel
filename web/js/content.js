@@ -49,7 +49,11 @@ const CONTENT_INFO = {
   datapack: {title: 'Datapacks', hint: 'Ajoutés au monde (recettes, mécaniques, aventures). Actifs au prochain démarrage.',
              placeholder: 'Chercher un datapack'},
 };
-const CAT_BOX = {content: 'catContent', modpacks: 'catModpacks', resourcepack: 'catResourcepack', datapacks: 'catDatapacks'};
+const CAT_BOX = {content: 'catContent', modpacks: 'catModpacks', resourcepack: 'catResourcepack', datapacks: 'catDatapacks', minigames: 'catMinigames'};
+/* Page Mini-jeux : catégorie « minigame » de Modrinth, dans le format que le logiciel accepte. */
+const MINIGAME_TYPE = {vanilla: 'datapack', paper: 'plugin', fabric: 'mod', neoforge: 'mod'};
+const MINIGAME_INFO = {title: 'Mini-jeux', hint: 'Mini-jeux depuis Modrinth : Manhunt, OneBlock, BedWars, Duels… En Vanilla ce sont des datapacks ; passe en Paper (catégorie Logiciel) pour les mini-jeux en plugin.',
+                       placeholder: 'Chercher un mini-jeu (manhunt, oneblock, bedwars…)'};
 const CP = {box: null, ctype: null, query: '', offset: 0, timer: null};
 
 function fmtCount(n){ return n >= 1e6 ? (n/1e6).toFixed(1) + ' M' : n >= 1e3 ? Math.round(n/1e3) + ' k' : String(n); }
@@ -58,6 +62,7 @@ function icon(url){ const img = el('img'); img.alt = ''; img.loading = 'lazy'; i
 async function openContentPage(s, cat){
   const box = $(CAT_BOX[cat]); box.innerHTML = '';
   const ctype = cat === 'content' ? ({paper: 'plugin', fabric: 'mod', neoforge: 'mod'})[s.software]
+              : cat === 'minigames' ? MINIGAME_TYPE[s.software] || 'datapack'
               : ({modpacks: 'modpack', resourcepack: 'resourcepack', datapacks: 'datapack'})[cat];
   if (!ctype){
     box.append(el('h3', 'cattitle', 'Plugins & mods'));
@@ -66,8 +71,8 @@ async function openContentPage(s, cat){
     box.append(note);
     return;
   }
-  const info = CONTENT_INFO[ctype];
-  Object.assign(CP, {box, ctype, cat, query: '', offset: 0});
+  const info = cat === 'minigames' ? MINIGAME_INFO : CONTENT_INFO[ctype];
+  Object.assign(CP, {box, ctype, cat, query: '', offset: 0, category: cat === 'minigames' ? 'minigame' : ''});
   box.append(el('h3', 'cattitle', info.title), el('div', 'hint', info.hint));
   if (ctype === 'mod'){
     const share = el('div', 'note');
@@ -155,14 +160,15 @@ async function checkUpdates(s){
 }
 
 async function runSearch(s, append){
-  const grid = CP.box.querySelector('.cgrid'); if (!grid) return;
+  const box = CP.box, grid = box.querySelector('.cgrid'); if (!grid) return;
   const ctype = CP.ctype;
   if (!append){ grid.innerHTML = ''; grid.append(el('div', 'muted', 'Recherche…')); }
   let r;
   try {
-    r = await API.get('/api/servers/' + s.id + '/content/search?type=' + ctype + '&q=' + encodeURIComponent(CP.query) + '&offset=' + CP.offset);
+    r = await API.get('/api/servers/' + s.id + '/content/search?type=' + ctype + '&q=' + encodeURIComponent(CP.query) + '&offset=' + CP.offset +
+                      (CP.category ? '&category=' + CP.category : ''));
   } catch(e){ grid.innerHTML = ''; grid.append(el('div', 'note warn', 'Modrinth injoignable : ' + e.message)); return; }
-  if (ctype !== CP.ctype) return;  // l'utilisateur a changé de page entre-temps
+  if (ctype !== CP.ctype || box !== CP.box) return;  // l'utilisateur a changé de page entre-temps
   if (!append) grid.innerHTML = '';
   if (!r.hits.length && !append) grid.append(el('div', 'muted', 'Aucun résultat compatible avec ce serveur.'));
   r.hits.forEach(h => {

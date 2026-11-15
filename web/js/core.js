@@ -28,8 +28,8 @@ const cur = () => S.servers.find(s => s.id === S.current) || null;
 /* Panels : chaque vue d'un type de serveur ne montre que les serveurs de ce type. */
 S.view = 'home';
 S.propDefaultsByKind = {};
-const KIND_LABEL = {speedrun: 'Speedrun', survival: 'Survie'};
-const VIEW_KIND = {speedrun: 'speedrun', survival: 'survival'};
+const KIND_LABEL = {speedrun: 'Speedrun', survival: 'Survie', adventure: 'Aventure'};
+const VIEW_KIND = {speedrun: 'speedrun', survival: 'survival', adventure: 'adventure'};
 const viewKind = () => S.view === 'server' ? (cur() ? kindOf(cur()) : null) : (VIEW_KIND[S.view] || null);
 const kindOf = (s) => s.kind || 'speedrun';
 const viewServers = () => { const k = viewKind(); return k ? S.servers.filter(s => kindOf(s) === k) : S.servers; };

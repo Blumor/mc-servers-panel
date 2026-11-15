@@ -61,8 +61,8 @@ def content_type(srv) -> str | None:
 
 
 def _check(srv, ctype: str) -> None:
-    if srv.kind != "survival":
-        raise RuntimeError("Le contenu Modrinth est réservé aux serveurs de survie.")
+    if srv.kind not in ("survival", "adventure"):
+        raise RuntimeError("Le contenu Modrinth est réservé aux serveurs de survie et d'aventure.")
     if ctype not in TYPES:
         raise ValueError("Type de contenu inconnu : %s" % ctype)
     if ctype in ("plugin", "mod") and content_type(srv) != ctype:
@@ -84,9 +84,16 @@ def _folder(srv, ctype: str) -> str:
 
 
 # ------------------------------------------------------------- recherche
-def search(srv, ctype: str, query: str = "", offset: int = 0, limit: int = 20) -> dict:
+CATEGORIES = ("minigame",)  # filtres proposés par l'interface (page Mini-jeux)
+
+
+def search(srv, ctype: str, query: str = "", offset: int = 0, limit: int = 20, category: str = "") -> dict:
     _check(srv, ctype)
     facets = [["project_type:%s" % ctype]]
+    if category:
+        if category not in CATEGORIES:
+            raise ValueError("Catégorie inconnue : %s" % category)
+        facets.append(["categories:%s" % category])
     if ctype == "modpack":
         facets.append(["categories:fabric", "categories:neoforge"])  # loaders que le panel sait lancer
     else:

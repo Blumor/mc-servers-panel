@@ -1,7 +1,19 @@
+## Nouveautés
+
+- **Nouveau nom : MC Servers Panel** (avant : MC Speedrun Panel). Le panel ne sert plus seulement au speedrun : l'exe s'appelle maintenant `MCServersPanel.exe`.
+- **Panel Aventure & mini-jeux** :
+  - catalogue de maps parkour (les 11 maps de Hielke) installées en un clic, téléchargées depuis le site de l'auteur ;
+  - import de ta propre map Java : fichier `.zip` glissé dans la page, ou lien direct ;
+  - la version de Minecraft est lue dans la map et choisie toute seule ; blocs de commande, vol et mode aventure réglés ;
+  - **Recommencer la map** en un clic (retour à l'état d'origine) ;
+  - mini-jeux Modrinth (Manhunt, OneBlock, BedWars…) en datapacks ou en plugins.
+
+**Mise à jour depuis `MCSpeedrunPanel.exe`** : pose `MCServersPanel.exe` dans le même dossier et supprime l'ancien. Le dossier `mcpanel-data` est repris tel quel (serveurs, mondes, sauvegardes).
+
 ## Installation (Windows)
 
-1. Télécharge **MCSpeedrunPanel.exe** ci-dessous (rien d'autre à installer : Python est inclus, Java et Minecraft sont téléchargés tout seuls).
-2. Range-le dans un dossier à lui (ex. `Documents\MC Speedrun Panel`), puis double-clic.
+1. Télécharge **MCServersPanel.exe** ci-dessous (rien d'autre à installer : Python est inclus, Java et Minecraft sont téléchargés tout seuls).
+2. Range-le dans un dossier à lui (ex. `Documents\MC Servers Panel`), puis double-clic.
 3. Le navigateur s'ouvre sur le panel. Laisse la fenêtre noire ouverte : la fermer arrête le panel et ses serveurs.
 
 Tes mondes et réglages sont dans le dossier `mcpanel-data`, créé à côté de l'exe.

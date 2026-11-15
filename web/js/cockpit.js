@@ -42,7 +42,7 @@ function render(){
 function renderInner(){
   renderNav();
   const v = S.view;
-  const sections = {home: 'home', manage: 'manage', survival: 'survlist', server: 'srvpage'};
+  const sections = {home: 'home', manage: 'manage', survival: 'survlist', adventure: 'advlist', server: 'srvpage'};
   Object.entries(sections).forEach(([view, id]) => $(id).classList.toggle('hidden', v !== view));
   $('btnNew').classList.toggle('hidden', v !== 'speedrun');
   $('btnSettings').classList.toggle('hidden', v !== 'speedrun');
@@ -50,6 +50,7 @@ function renderInner(){
   if (v === 'home') return renderHome();
   if (v === 'manage') return renderManage();
   if (v === 'survival') return renderSurvivalList();
+  if (v === 'adventure') return renderAdventureList();
   if (v === 'server') return renderServerPage();
   const list = viewServers();
   const has = list.length > 0;
@@ -220,6 +221,7 @@ function onJob(job){
     clearTimeout(jobHideTimer);
     jobHideTimer = setTimeout(()=>{ jobBar.style.width='0%'; }, 450);
     if (job.kind === 'content') onContentJob(job);
+    if (job.kind === 'map' || job.kind === 'map-restart') onMapJob(job);
     if (job.kind === 'backup' || job.kind === 'restore'){
       S.usage[job.target] = null; manageSig = '';
       if ($('scrimSet').classList.contains('on') && cur() && cur().id === job.target) loadBackups(job.target);

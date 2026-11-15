@@ -34,6 +34,7 @@
     <a href="#/" data-view="home">🏠 Accueil</a>
     <a href="#/speedrun" data-view="speedrun">💀 Speedrun</a>
     <a href="#/survie" data-view="survival">🏡 Survie</a>
+    <a href="#/aventure" data-view="adventure">🗺️ Aventure</a>
     <a href="#/serveurs" data-view="manage">🛠️ Mes serveurs</a>
   </nav>
 
@@ -47,9 +48,9 @@
       <a class="tile" href="#/speedrun"><span class="ticon">💀</span><b>Speedrun</b>
         <span>Mondes jetables en hardcore, reset en un clic (touche R), mode Turbo.</span><em id="countSpeedrun"></em></a>
       <a class="tile" href="#/survie"><span class="ticon">🏡</span><b>Survie entre potes</b>
-        <span>Un monde qui dure, sauvegardé automatiquement. Plugins et mods arrivent bientôt.</span><em id="countSurvival"></em></a>
-      <div class="tile soon" aria-disabled="true"><span class="ticon">🗺️</span><b>Aventure &amp; mini-jeux</b>
-        <span>Maps aventure et mini-jeux prêts à jouer, à installer en un clic.</span><em>Bientôt</em></div>
+        <span>Un monde qui dure, sauvegardé automatiquement. Plugins, mods, modpacks et packs de ressources.</span><em id="countSurvival"></em></a>
+      <a class="tile" href="#/aventure"><span class="ticon">🗺️</span><b>Aventure &amp; mini-jeux</b>
+        <span>Maps parkour et aventure installées en un clic, ta propre map en ZIP, ou des mini-jeux.</span><em id="countAdventure"></em></a>
       <a class="tile" href="#/serveurs"><span class="ticon">🛠️</span><b>Mes serveurs</b>
         <span>Tous tes serveurs : état, place disque, sauvegardes, réglages avancés.</span><em id="countAll"></em></a>
     </div>
@@ -62,6 +63,7 @@
         <div style="margin-left:auto;display:flex;gap:7px">
           <a class="btn sm ghost" href="#/speedrun">＋ Speedrun</a>
           <a class="btn sm ghost" href="#/survie">＋ Survie</a>
+          <a class="btn sm ghost" href="#/aventure">＋ Aventure</a>
         </div>
       </div>
       <div class="card-b"><div class="mlist" id="manageList"></div></div>
@@ -75,6 +77,27 @@
       <p>Un monde qui dure, sauvegardé tout seul. Crée un serveur, règle-le, lance-le.</p>
     </div>
     <div class="tiles" id="survCards"></div>
+  </section>
+
+  <!-- AVENTURE & MINI-JEUX : maps du catalogue, import, serveurs existants -->
+  <section id="advlist" class="hidden">
+    <div class="homehead">
+      <h2 class="big">Aventure &amp; mini-jeux</h2>
+      <p>Choisis une map : le panel la télécharge, prend la bonne version de Minecraft et règle le serveur.</p>
+    </div>
+    <div class="sectitle hidden" id="advMineTitle">Mes serveurs aventure</div>
+    <div class="tiles" id="advCards"></div>
+    <div class="card advpick">
+      <div class="card-b">
+        <h3 class="cattitle">Choisir une map</h3>
+        <div class="cgrid" id="advCatalog"></div>
+        <div class="sectitle">Importer ta map</div>
+        <div id="advImport"></div>
+        <div class="sectitle">Trouver d’autres maps</div>
+        <div class="hint" style="margin:-4px 0 10px">Télécharge le fichier .zip d’une map Java sur l’un de ces sites, puis importe-le ci-dessus.</div>
+        <div class="sites" id="advSites"></div>
+      </div>
+    </div>
   </section>
 
   <!-- PAGE D'UN SERVEUR (survie) : catégories à gauche, une page par catégorie -->
@@ -133,6 +156,8 @@
             <button class="btn sm danger" id="gDelete">🗑 Supprimer le serveur</button>
           </div>
         </div></div>
+        <div class="cat card" data-cat="map"><div class="card-b" id="catMap"></div></div>
+        <div class="cat card" data-cat="minigames"><div class="card-b" id="catMinigames"></div></div>
         <div class="cat card" data-cat="software"><div class="card-b">
           <h3 class="cattitle">Logiciel</h3>
           <div class="hint" style="margin:-6px 0 16px">Choisis ce que le serveur fait tourner. Serveur arrêté ; le monde est sauvegardé avant chaque changement.</div>
@@ -431,6 +456,7 @@
 <script src="js/settings.js"></script>
 <script src="js/views.js"></script>
 <script src="js/content.js"></script>
+<script src="js/maps.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

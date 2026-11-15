@@ -52,8 +52,8 @@ jobs:
         shell: pwsh
         run: |
           $dir = New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\fumee"
-          Copy-Item dist\MCSpeedrunPanel.exe $dir
-          $exe = Join-Path $dir "MCSpeedrunPanel.exe"
+          Copy-Item dist\MCServersPanel.exe $dir
+          $exe = Join-Path $dir "MCServersPanel.exe"
           Start-Process -FilePath $exe -ArgumentList "--no-browser", "--port", "18765" | Out-Null
           $ping = $null
           for ($i = 0; $i -lt 60 -and -not $ping; $i++) {
@@ -61,7 +61,7 @@ jobs:
             try { $ping = Invoke-RestMethod -Uri "http://127.0.0.1:18765/api/ping" } catch {}
           }
           try {
-            if ($ping.app -ne "MC Speedrun Panel") { throw "Le panel ne répond pas" }
+            if ($ping.app -ne "MC Servers Panel") { throw "Le panel ne répond pas" }
             $page = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:18765/"
             if ($page.Content -notmatch "MC Panel") { throw "Interface absente de l'exe" }
             if (-not (Test-Path (Join-Path $dir "mcpanel-data\servers"))) { throw "mcpanel-data absent à côté de l'exe" }
@@ -69,15 +69,15 @@ jobs:
             if ($second.ExitCode -ne 0) { throw "Second lancement : code $($second.ExitCode)" }
             Write-Host "OK : panel $($ping.version), interface servie, données à côté de l'exe, double lancement géré"
           } finally {
-            Stop-Process -Name MCSpeedrunPanel -Force -ErrorAction SilentlyContinue
+            Stop-Process -Name MCServersPanel -Force -ErrorAction SilentlyContinue
           }
 
       - name: Artefact (lancement manuel)
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         uses: actions/upload-artifact@v7
         with:
-          name: MCSpeedrunPanel
-          path: dist/MCSpeedrunPanel.exe
+          name: MCServersPanel
+          path: dist/MCServersPanel.exe
 
       - name: Publier la release
         if: startsWith(github.ref, 'refs/tags/')
@@ -85,6 +85,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
-          gh release create "$env:GITHUB_REF_NAME" dist/MCSpeedrunPanel.exe
-          --title "MC Speedrun Panel $env:GITHUB_REF_NAME"
+          gh release create "$env:GITHUB_REF_NAME" dist/MCServersPanel.exe
+          --title "MC Servers Panel $env:GITHUB_REF_NAME"
           --notes-file packaging/RELEASE_NOTES.md

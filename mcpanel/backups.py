@@ -134,8 +134,9 @@ def delete(sid: str, name: str) -> None:
     _path(sid, name).unlink()
 
 
-def restore(srv, name: str, report=None) -> dict:
-    """Remplace le monde par celui de la sauvegarde. Le monde actuel est d'abord sauvegardé."""
+def restore(srv, name: str, report=None, safety: bool = True) -> dict:
+    """Remplace le monde par celui de la sauvegarde. Le monde actuel est d'abord sauvegardé
+    (sauf safety=False : « Recommencer la map », où la progression doit justement disparaître)."""
     from .manager import async_delete  # import tardif : manager importe ce module
 
     say = report or (lambda *_a: None)
@@ -144,9 +145,9 @@ def restore(srv, name: str, report=None) -> dict:
     if was_running:
         srv.stop(report)
     workdir = srv.live.workdir
-    safety = None
-    if srv.world_dirs(workdir):
-        safety = create(srv, "avant-restauration", report)["name"]
+    safety_name = None
+    if safety and srv.world_dirs(workdir):
+        safety_name = create(srv, "avant-restauration", report)["name"]
 
     say("Extraction de la sauvegarde...", 0.6)
     staging = workdir / ".restauration"
@@ -173,7 +174,7 @@ def restore(srv, name: str, report=None) -> dict:
         if was_running:  # même en cas d'échec : le monde n'a pas été touché, on le relance
             srv.start(report)
     say("Monde restauré depuis %s" % name, 1.0)
-    return {"restored": name, "safety_backup": safety}
+    return {"restored": name, "safety_backup": safety_name}
 
 
 def disk_usage(path: Path) -> int:

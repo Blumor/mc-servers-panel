@@ -179,7 +179,16 @@ SURVIVAL_DEFAULTS = {
     "motd": "\\u00a7aSurvie \\u00a78| \\u00a7fentre potes",
     "sync-chunk-writes": "true",
 }
-KIND_DEFAULTS = {"speedrun": SPEEDRUN_DEFAULTS, "survival": SURVIVAL_DEFAULTS}
+# Aventure & mini-jeux : maps toutes faites. Blocs de commande et vol autorisés (la plupart
+# des maps en ont besoin), mode aventure, pas de protection du spawn.
+ADVENTURE_DEFAULTS = {
+    **SURVIVAL_DEFAULTS,
+    "allow-flight": "true",
+    "enable-command-block": "true",
+    "gamemode": "adventure",
+    "motd": "\\u00a7dAventure \\u00a78| \\u00a7fmaps & mini-jeux",
+}
+KIND_DEFAULTS = {"speedrun": SPEEDRUN_DEFAULTS, "survival": SURVIVAL_DEFAULTS, "adventure": ADVENTURE_DEFAULTS}
 
 
 def defaults_for(kind: str | None) -> dict:
@@ -306,7 +315,7 @@ def write(path: Path, values: dict[str, str]) -> None:
     """Fusionne values dans le fichier existant sans perdre les autres clés."""
     current = read(path)
     current.update({k: str(v) for k, v in values.items()})
-    lines = ["#Minecraft server properties", "#Genere par MC Speedrun Panel"]
+    lines = ["#Minecraft server properties", "#Genere par MC Servers Panel"]
     lines += ["%s=%s" % (k, _encode(current[k])) for k in sorted(current)]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

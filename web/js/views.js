@@ -1,14 +1,14 @@
 "use strict";
 /* Vues : accueil, panels par type de serveur, « Mes serveurs ». Navigation par #/adresse. */
-const ROUTES = {'': 'home', 'speedrun': 'speedrun', 'survie': 'survival', 'serveurs': 'manage', 'serveur': 'server'};
-const PANEL_HASH = {speedrun: '#/speedrun', survival: '#/survie'};
-const VIEW_TITLE = {home: 'MC Panel', speedrun: 'Speedrun', survival: 'Survie entre potes', manage: 'Mes serveurs'};
+const ROUTES = {'': 'home', 'speedrun': 'speedrun', 'survie': 'survival', 'aventure': 'adventure', 'serveurs': 'manage', 'serveur': 'server'};
+const PANEL_HASH = {speedrun: '#/speedrun', survival: '#/survie', adventure: '#/aventure'};
+const VIEW_TITLE = {home: 'MC Panel', speedrun: 'Speedrun', survival: 'Survie entre potes', adventure: 'Aventure & mini-jeux', manage: 'Mes serveurs'};
 
 function route(){
   const parts = location.hash.replace(/^#\/?/, '').split('/');
   const view = ROUTES[parts[0]] || 'home';
   if (view === 'server'){
-    const id = decodeURIComponent(parts[1] || ''), cat = PAGE_CATS.some(c => c[0] === parts[2]) ? parts[2] : 'dashboard';
+    const id = decodeURIComponent(parts[1] || ''), cat = ALL_CATS.some(c => c[0] === parts[2]) ? parts[2] : 'dashboard';
     const same = S.view === 'server' && S.pageId === id && S.pageCat === cat;
     if (same) return;
     const newServer = S.pageId !== id || S.view !== 'server';
@@ -20,7 +20,7 @@ function route(){
   }
   if (view === S.view) return;
   if (S.view === 'server') placeDash(false);
-  S.view = view; tabsSig = ''; S.playersSig = null; manageSig = ''; survSig = '';
+  S.view = view; tabsSig = ''; S.playersSig = null; manageSig = ''; survSig = ''; advSig = '';
   render();
 }
 
@@ -34,6 +34,7 @@ function renderHome(){
   const count = (k) => S.servers.filter(s => kindOf(s) === k).length;
   $('countSpeedrun').textContent = label(count('speedrun'));
   $('countSurvival').textContent = label(count('survival'));
+  $('countAdventure').textContent = label(count('adventure'));
   $('countAll').textContent = label(S.servers.length);
   $('brandsub').textContent = 'prêt';
 }
@@ -74,7 +75,7 @@ function renderManage(){
   manageSig = sig;
   const box = $('manageList'); box.innerHTML = '';
   if (!S.servers.length){
-    box.append(el('div', 'muted', 'Aucun serveur. Crée-en un depuis le panel Speedrun ou Survie.'));
+    box.append(el('div', 'muted', 'Aucun serveur. Crée-en un depuis le panel Speedrun, Survie ou Aventure.'));
     return;
   }
   S.servers.forEach(s => {
@@ -90,13 +91,13 @@ function renderManage(){
                      ' · dernière ' + fmtAgo(s.last_backup));
     const acts = el('div', 'acts');
     const button = (label, title, fn) => { const b = el('button', 'btn sm ghost', label); b.title = title; b.onclick = fn; acts.append(b); return b; };
-    button('Ouvrir', 'Ouvrir ce serveur', () => { S.current = s.id; location.hash = kind === 'survival' ? pageHash(s.id) : PANEL_HASH[kind]; });
+    button('Ouvrir', 'Ouvrir ce serveur', () => { S.current = s.id; location.hash = kind === 'speedrun' ? PANEL_HASH[kind] : pageHash(s.id); });
     const up = s.state === 'running', busy = ['starting','stopping','resetting','installing'].includes(s.state);
     button(up ? '■' : '▶', up ? 'Arrêter' : 'Démarrer', () => manageAction(s, up ? 'stop' : 'start')).disabled = busy;
     button('💾', 'Sauvegarder maintenant', () => manageAction(s, 'backups')).disabled = busy;
     button('⚙️', 'Réglages, joueurs, sauvegardes', () => {
       S.current = s.id;
-      if (kind === 'survival') location.hash = pageHash(s.id, 'general'); else $('btnSettings').onclick();
+      if (kind !== 'speedrun') location.hash = pageHash(s.id, 'general'); else $('btnSettings').onclick();
     });
     row.append(name, meta1, meta2, acts);
     box.append(row);
@@ -143,10 +144,12 @@ async function createSurvival(){
   } catch(e){ toast(e.message, 'err'); }
 }
 
-/* ------------------------------------------------- page d'un serveur (survie) */
-const PAGE_CATS = [
+/* ------------------------------------------ page d'un serveur (survie, aventure) */
+const ALL_CATS = [
   ['dashboard', '📊', 'Tableau de bord'],
   ['general', '⚙️', 'Général'],
+  ['map', '🗺️', 'Map'],
+  ['minigames', '🎯', 'Mini-jeux'],
   ['software', '🧩', 'Logiciel'],
   ['content', '🔌', 'Plugins & mods'],
   ['modpacks', '🎁', 'Modpacks'],
@@ -157,6 +160,11 @@ const PAGE_CATS = [
   ['files', '📝', 'Fichiers de config'],
   ['advanced', '🧪', 'Avancé'],
 ];
+const KIND_CATS = {
+  survival: ['dashboard', 'general', 'software', 'content', 'modpacks', 'resourcepack', 'datapacks', 'players', 'backups', 'files', 'advanced'],
+  adventure: ['dashboard', 'general', 'map', 'minigames', 'software', 'content', 'resourcepack', 'datapacks', 'players', 'backups', 'files', 'advanced'],
+};
+const pageCats = (s) => ALL_CATS.filter(c => (KIND_CATS[kindOf(s)] || KIND_CATS.survival).includes(c[0]));
 const SOFTWARE_LABEL = {vanilla: 'Vanilla', paper: 'Paper', fabric: 'Fabric', neoforge: 'NeoForge'};
 const contentLabel = (sw) => sw === 'paper' ? 'Plugins' : (sw === 'fabric' || sw === 'neoforge') ? 'Mods' : 'Plugins & mods';
 const pageHash = (id, cat) => '#/serveur/' + encodeURIComponent(id) + (cat ? '/' + cat : '');
@@ -177,7 +185,7 @@ function renderServerPage(){
   $('pgState').className = 'state-pill ' + cls;
   $('pgState').replaceChildren(el('span', 'dot ' + dotClass(s.state)), el('span', '', lab));
   $('pgName').textContent = s.name;
-  $('pgMeta').textContent = 'Survie · ' + (SOFTWARE_LABEL[s.software] || 'Vanilla') + ' · ' +
+  $('pgMeta').textContent = (KIND_LABEL[kindOf(s)] || 'Survie') + (s.map ? ' · ' + s.map.title : '') + ' · ' + (SOFTWARE_LABEL[s.software] || 'Vanilla') + ' · ' +
     (s.version === '?' ? 'dernière version' : 'Minecraft ' + s.version) + ' · port ' + s.port;
   setChip('pgAddr', '📋', s.address);
   const up = s.state === 'running', busy = ['starting','stopping','resetting','installing'].includes(s.state);
@@ -188,7 +196,7 @@ function renderServerPage(){
   if (sig !== pageNavSig){
     pageNavSig = sig;
     const nav = $('pgNav'); nav.innerHTML = '';
-    PAGE_CATS.forEach(([cat, icon, label]) => {
+    pageCats(s).forEach(([cat, icon, label]) => {
       const a = el('a', cat === S.pageCat ? 'on' : '', icon + '  ' + (cat === 'content' ? contentLabel(s.software) : label));
       a.href = pageHash(s.id, cat);
       nav.append(a);
@@ -206,7 +214,8 @@ async function loadPageCategory(cat){
   if (cat === 'players'){ $('catPlayers').append($('panePlayers')); return loadPlayers(s.id); }
   if (cat === 'backups'){ $('catBackups').append($('paneBackups')); return loadBackups(s.id); }
   if (cat === 'software') return openSoftwarePage(s);
-  if (['content', 'modpacks', 'resourcepack', 'datapacks'].includes(cat)) return openContentPage(s, cat);
+  if (['content', 'modpacks', 'resourcepack', 'datapacks', 'minigames'].includes(cat)) return openContentPage(s, cat);
+  if (cat === 'map') return openMapPage(s);
   if (cat === 'files') return openFilesPage(s);
   if (cat === 'advanced'){
     $('advSlot').append($('paneProps'));
@@ -265,7 +274,7 @@ async function savePage(body, count){
 $('gSave').onclick = () => {
   const seed = $('gSeed').value.trim();
   savePage({
-    name: $('gName').value.trim() || 'Survie', version: $('gVersion').value, port: +$('gPort').value,
+    name: $('gName').value.trim() || KIND_LABEL[kindOf(cur() || {})] || 'Survie', version: $('gVersion').value, port: +$('gPort').value,
     ram_mb: +$('gRam').value, auto_backup_hours: +$('gBackup').value,
     seed_mode: seed ? 'fixed' : 'random', seed,
     settings: {
@@ -289,7 +298,7 @@ $('gClean').onclick = async () => {
 $('gDelete').onclick = async () => {
   const s = cur(); if (!s) return;
   if (!confirm('Supprimer définitivement le serveur « ' + s.name + ' » et son monde ? Ses sauvegardes restent dans le dossier backups.')) return;
-  try { await API.del('/api/servers/' + s.id); S.current = null; toast('Serveur supprimé', 'ok'); location.hash = '#/survie'; refresh(); }
+  try { await API.del('/api/servers/' + s.id); S.current = null; toast('Serveur supprimé', 'ok'); location.hash = PANEL_HASH[kindOf(s)] || '#/serveurs'; refresh(); }
   catch(e){ toast(e.message, 'err'); }
 };
 $('pgStart').onclick = () => act('start');

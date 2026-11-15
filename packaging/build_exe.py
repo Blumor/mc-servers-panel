@@ -1,4 +1,4 @@
-"""Construit l'exécutable autonome : dist/MCSpeedrunPanel.exe (Windows) ou dist/MCSpeedrunPanel.
+"""Construit l'exécutable autonome : dist/MCServersPanel.exe (Windows) ou dist/MCServersPanel.
 
 Prérequis : pip install pyinstaller. Utilisé par .github/workflows/release.yml.
 """
@@ -26,8 +26,8 @@ VERSION_INFO = """VSVersionInfo(
     StringFileInfo([StringTable('040C04B0', [
       StringStruct('FileDescription', '{name}'),
       StringStruct('FileVersion', '{version}'),
-      StringStruct('InternalName', 'MCSpeedrunPanel'),
-      StringStruct('OriginalFilename', 'MCSpeedrunPanel.exe'),
+      StringStruct('InternalName', 'MCServersPanel'),
+      StringStruct('OriginalFilename', 'MCServersPanel.exe'),
       StringStruct('ProductName', '{name}'),
       StringStruct('ProductVersion', '{version}')])]),
     VarFileInfo([VarStruct('Translation', [1036, 1200])])
@@ -40,7 +40,7 @@ def main() -> None:
     BUILD.mkdir(exist_ok=True)
     args = [
         str(ROOT / "packaging" / "launcher.py"),
-        "--name", "MCSpeedrunPanel",
+        "--name", "MCServersPanel",
         "--onefile",
         "--console",          # la fenêtre affiche l'adresse du panel ; la fermer arrête tout
         "--noupx",            # exe compressé par UPX = faux positifs antivirus garantis

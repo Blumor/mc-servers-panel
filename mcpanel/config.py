@@ -9,8 +9,9 @@ import sys
 import threading
 from pathlib import Path
 
-APP_NAME = "MC Speedrun Panel"
-APP_VERSION = "2.2.0"
+APP_NAME = "MC Servers Panel"
+OLD_APP_NAMES = ("MC Speedrun Panel",)  # même panel, ancien nom (instance déjà lancée, données)
+APP_VERSION = "2.3.0"
 
 # Exécutable (PyInstaller, un seul fichier) : le code est décompressé dans un dossier
 # temporaire effacé à la fermeture. L'interface est lue là-dedans, mais les données
@@ -31,7 +32,8 @@ def _data_root() -> Path:
         return beside_exe
     except OSError:  # exe rangé dans un dossier protégé (Program Files...) : profil utilisateur
         base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".local" / "share")
-        return base / "MC Speedrun Panel"
+        old = base / "MC Speedrun Panel"
+        return old if old.is_dir() and not (base / APP_NAME).exists() else base / APP_NAME
 
 
 ROOT = _data_root()

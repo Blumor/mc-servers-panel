@@ -476,3 +476,29 @@ a.logo{color:inherit;text-decoration:none}
 .fedit textarea{width:100%;min-height:52vh;border-radius:var(--r-sm);border:1px solid var(--stroke);background:rgba(0,0,0,.35);
   color:#d7def7;font-family:var(--mono);font-size:12.5px;line-height:1.55;padding:12px;resize:vertical;outline:none}
 .fpath{font-family:var(--mono);font-size:12px;color:var(--dim-2);margin-bottom:8px}
+
+/* ------------------------------------------------ Aventure & mini-jeux */
+#advCards:not(:empty){margin-bottom:22px}
+#advMineTitle{margin:0 0 10px}
+.advpick{margin-top:6px}
+.mapcard .micon{width:44px;height:44px;border-radius:10px;background:#1a1d33;display:grid;place-items:center;font-size:22px}
+.mapcard.blank{border-style:dashed}
+.mapimport{display:flex;flex-direction:column;gap:4px}
+.mapimport .drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:96px;padding:16px;
+  border:1.5px dashed var(--stroke);border-radius:var(--r-md);cursor:pointer;text-align:center;transition:border-color .15s,background .15s}
+.mapimport .drop:hover,.mapimport .drop.over{border-color:rgba(34,211,238,.6);background:rgba(34,211,238,.06)}
+.mapimport .drop span{font-size:12px;color:var(--dim-2)}
+.mapimport .csearch{margin:10px 0 6px}
+.maptype{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--dim)}
+.maptype select{height:34px;border-radius:10px;border:1px solid var(--stroke);background:rgba(255,255,255,.045);color:inherit;padding:0 10px}
+.sites{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.site{display:flex;flex-direction:column;gap:4px;padding:13px;border-radius:var(--r-sm);border:1px solid var(--stroke);
+  background:rgba(255,255,255,.03);color:inherit;text-decoration:none}
+.site:hover{border-color:rgba(34,211,238,.45)}
+.site span{font-size:12px;color:var(--dim)}
+.mapnow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;padding:16px;margin-bottom:6px;
+  border-radius:var(--r-md);border:1px solid rgba(163,230,53,.45);background:rgba(163,230,53,.05)}
+.mapnow b{font-size:16px}
+.mapnow .m{font-size:12px;color:var(--dim-2);margin:4px 0}
+.mapnow .a{font-size:12px}
+.mapnow .acts{display:flex;flex-wrap:wrap;gap:8px}

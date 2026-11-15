@@ -2,10 +2,10 @@
 setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
 chcp 65001 >nul 2>&1
-title MC Speedrun Panel
+title MC Servers Panel
 
 echo.
-echo    ####   MC SPEEDRUN PANEL   ####
+echo    ####   MC SERVERS PANEL   ####
 echo.
 
 if not exist "mcpanel\__main__.py" (
