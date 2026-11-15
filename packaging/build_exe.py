@@ -56,7 +56,7 @@ def main() -> None:
         version_file = BUILD / "version_info.txt"
         version_file.write_text(VERSION_INFO.format(nums=nums, name=APP_NAME, version=APP_VERSION),
                                 encoding="utf-8")
-        args += ["--version-file", str(version_file)]
+        args += ["--version-file", str(version_file), "--icon", str(ROOT / "packaging" / "icon.ico")]
     PyInstaller.__main__.run(args)
 
 

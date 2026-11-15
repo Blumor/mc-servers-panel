@@ -11,7 +11,7 @@ from pathlib import Path
 
 APP_NAME = "MC Servers Panel"
 OLD_APP_NAMES = ("MC Speedrun Panel",)  # même panel, ancien nom (instance déjà lancée, données)
-APP_VERSION = "2.3.0"
+APP_VERSION = "2.3.1"
 
 # Exécutable (PyInstaller, un seul fichier) : le code est décompressé dans un dossier
 # temporaire effacé à la fermeture. L'interface est lue là-dedans, mais les données
