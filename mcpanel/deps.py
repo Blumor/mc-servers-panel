@@ -181,26 +181,27 @@ def scan_java(max_age: float = 30.0) -> list[dict]:
     return list(result)
 
 
-def find_java(minimum: int) -> str | None:
-    """Java installé le plus proche du minimum requis, par le haut.
+def find_java(minimum: int, maximum: int | None = None) -> str | None:
+    """Java installé le plus proche du minimum requis, par le haut, sans dépasser maximum.
 
     On prend la plus basse version qui convient plutôt que la plus récente:
     un Minecraft ancien qui demande Java 8 ne tourne pas sur Java 21.
     """
+    key = (minimum, maximum)
     with _java_lock:
-        cached = _java_cache.get(minimum)
+        cached = _java_cache.get(key)
         if cached and Path(cached).exists():
             return cached
         best = None
         best_major = None
         for entry in scan_java():
             major = entry["major"]
-            if major < minimum:
+            if major < minimum or (maximum is not None and major > maximum):
                 continue
             if best_major is None or major < best_major:
                 best, best_major = entry["path"], major
         if best:
-            _java_cache[minimum] = best
+            _java_cache[key] = best
         return best
 
 
@@ -301,10 +302,44 @@ def _safe_extract_tar(tf: tarfile.TarFile, dest: Path) -> None:
 def ensure_java(mc_version: str, on_progress=None) -> str:
     """Garantit un Java compatible avec la version Minecraft. Installe si absent."""
     needed = cfg.required_java(mc_version)
-    found = find_java(needed)
+    # Avant la 1.17, Mojang vise Java 8 (son launcher l'embarque) : on s'y tient, même si
+    # un Java plus récent est installé, plutôt que de risquer un plantage au démarrage.
+    found = find_java(needed, maximum=8 if needed == 8 else None)
     if found:
         return found
     return install_java(needed, on_progress=on_progress)
+
+
+# Log4Shell (CVE-2021-44228) : les serveurs 1.7 à 1.18.0 embarquent un log4j qui exécute du
+# code reçu dans un simple message de chat. Correctifs officiels de Mojang ; les fichiers
+# sont adressés par leur SHA-1, vérifié au téléchargement. Rien à faire avant 1.7 ni depuis 1.18.1.
+_LOG4J_FIXES = {
+    "log4j2_17-111.xml":
+        "https://launcher.mojang.com/v1/objects/4bb89a97a66f350bc9f73b3ca8509632682aea2e/log4j2_17-111.xml",
+    "log4j2_112-116.xml":
+        "https://launcher.mojang.com/v1/objects/02937d122c86ce73319ef9975b58896fc1b491d1/log4j2_112-116.xml",
+}
+_log4j_lock = threading.Lock()
+
+
+def log4j_fix(mc_version: str) -> tuple[list[str], Path | None]:
+    """(arguments JVM, fichier de config à copier dans le dossier du serveur)."""
+    version = cfg.parse_mc_version(mc_version) if mc_version[:1].isdigit() else (99, 0, 0)
+    if (1, 17, 0) <= version < (1, 18, 1):
+        return ["-Dlog4j2.formatMsgNoLookups=true"], None
+    if (1, 7, 0) <= version < (1, 12, 0):
+        name = "log4j2_17-111.xml"
+    elif (1, 12, 0) <= version < (1, 17, 0):
+        name = "log4j2_112-116.xml"
+    else:
+        return [], None
+    url = _LOG4J_FIXES[name]
+    dest = cfg.CACHE_DIR / name
+    with _log4j_lock:
+        if not dest.exists():
+            download(url, dest, expect_sha1=url.rsplit("/", 2)[-2])
+    # Chemin relatif, comme dans les consignes Mojang : le fichier est copié dans le dossier du serveur.
+    return ["-Dlog4j.configurationFile=" + name], dest
 
 
 # --------------------------------------------------------------------------- #
@@ -339,6 +374,8 @@ def list_versions(kind: str = "release", limit: int = 60) -> list[dict]:
     for entry in data.get("versions", []):
         if kind != "all" and entry.get("type") != kind:
             continue
+        if entry.get("type") == "release" and cfg.parse_mc_version(entry["id"]) < (1, 2, 5):
+            continue  # Mojang ne fournit pas de jar serveur avant la 1.2.5
         out.append({"id": entry["id"], "type": entry["type"], "released": entry.get("releaseTime", "")[:10]})
         if len(out) >= limit:
             break

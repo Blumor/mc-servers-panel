@@ -16,6 +16,15 @@ BOOL, INT, STR, ENUM = "bool", "int", "str", "enum"
 # dossier du serveur, jamais un chemin (« .. », « / », lecteur Windows...).
 LEVEL_NAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-]{0,63}$")
 
+# Avant la 1.14, difficulty et gamemode s'écrivaient en nombres : « hard » y est illisible et
+# Minecraft repasse sans prévenir en easy/survival. Les versions récentes acceptent les deux.
+# Le panel garde les noms et ne convertit qu'au lancement d'une vieille version.
+NUMERIC_ENUMS = {
+    "difficulty": ("peaceful", "easy", "normal", "hard"),
+    "gamemode": ("survival", "creative", "adventure", "spectator"),
+}
+NUMERIC_ENUMS_BEFORE = (1, 14, 0)
+
 # Clés pilotées par le panel : l'utilisateur les voit mais ne les édite pas ici.
 LOCKED = ("server-port", "query.port", "prevent-proxy-connections", "level-seed")
 
@@ -216,6 +225,9 @@ def coerce(key: str, value) -> str | None:
     if spec["type"] == ENUM:
         if text in spec["options"]:
             return text
+        names = NUMERIC_ENUMS.get(key)
+        if names and text.isdigit() and int(text) < len(names):
+            return names[int(text)]  # valeur numérique laissée par une vieille version
         return None
 
     if key == "level-name":
@@ -293,6 +305,19 @@ def bootstrap(path: Path, port: int, overrides: dict | None = None) -> dict[str,
 def effective(path: Path) -> dict[str, str]:
     """Valeurs actuelles, complétées par les défauts du schéma pour les clés absentes."""
     current = read(path)
+    for key, names in NUMERIC_ENUMS.items():
+        value = current.get(key, "")
+        if value.isdigit() and int(value) < len(names):
+            current[key] = names[int(value)]  # l'interface parle en noms
     for item in SCHEMA:
         current.setdefault(item["key"], item.get("default", ""))
     return current
+
+
+def use_numeric_enums(path: Path) -> None:
+    """Réécrit difficulty/gamemode en nombres, pour un serveur antérieur à la 1.14."""
+    current = read(path)
+    patch = {key: str(names.index(current[key]))
+             for key, names in NUMERIC_ENUMS.items() if current.get(key) in names}
+    if patch:
+        write(path, patch)

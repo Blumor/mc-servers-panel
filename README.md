@@ -134,7 +134,12 @@ servers/<nom>/         un dossier par serveur (monde, config, logs)
 .trash/                suppressions différées (renommage instantané, effacement en fond)
 ```
 
-Java requis : 26.x → Java 25, 1.20.5+ → 21, 1.18+ → 17. Le panel prend un Java installé
+Versions : toutes les releases depuis la 1.2.5 (Mojang ne fournit pas de serveur avant). Pour
+les vieilles versions, le panel s'adapte tout seul : Java 8, `difficulty`/`gamemode` écrits en
+nombres avant la 1.14, correctif officiel Mojang contre Log4Shell de la 1.7 à la 1.18.0.
+
+Java requis : 26.x → Java 25, 1.20.5+ → 21, 1.18+ → 17, 1.17 → 16, avant → Java 8 (pas plus
+récent : certaines vieilles versions plantent). Le panel prend un Java installé
 compatible, sinon télécharge un JRE portable dans `.runtime/` (sans droits admin).
 
 ---

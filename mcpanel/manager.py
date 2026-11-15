@@ -149,6 +149,8 @@ class ManagedServer:
         self.create_notes: list[str] = []
         self._java: str | None = None
         self._jar: Path | None = None
+        self._jvm_args: list[str] = []          # correctif Log4Shell selon la version
+        self._log4j_file: Path | None = None
         self._uuid_lock = threading.Lock()
 
     # ------------------------------------------------------------ persistence
@@ -266,6 +268,11 @@ class ManagedServer:
                 )
             except Exception as exc:  # noqa: BLE001
                 errors.append("Minecraft %s: %s" % (version, exc))
+                return
+            try:
+                results["log4j"] = deps.log4j_fix(version)
+            except Exception as exc:  # noqa: BLE001 - pas de serveur vulnérable sans son correctif
+                errors.append("Correctif Log4Shell de Minecraft %s introuvable: %s" % (version, exc))
 
         say("Vérification de Java et du jar serveur...", 0.02)
         threads = [
@@ -282,6 +289,7 @@ class ManagedServer:
 
         self._java = str(results["java"])
         self._jar = Path(str(results["jar"]))
+        self._jvm_args, self._log4j_file = results["log4j"]
         self.deps_ready = True
         say("Dépendances prêtes", 0.96)
         return self._java, self._jar
@@ -337,7 +345,7 @@ class ManagedServer:
         """Démarre un slot et réessaie une fois si la panne est réparable."""
         for attempt in (0, 1):
             self.prepare_dir(proc.workdir, port, fresh_seed=fresh_seed)
-            proc.start(self._java, self._jar, ram, port)
+            proc.start(self._java, self._jar, ram, port, extra_args=self._jvm_args)
             if proc.wait_ready(timeout):
                 return ram
             fixed, ram = self._try_fix(proc, ram, report)
@@ -405,6 +413,12 @@ class ManagedServer:
             canonical["level-seed"] = self._seed_value()
             canonical["prevent-proxy-connections"] = "false"
             props.write(path / "server.properties", canonical)
+
+        if self._log4j_file:  # Minecraft lit le correctif Log4Shell depuis son dossier
+            shutil.copy2(self._log4j_file, path / self._log4j_file.name)
+        version = self.meta.get("version") or ""
+        if version[:1].isdigit() and cfg.parse_mc_version(version) < props.NUMERIC_ENUMS_BEFORE:
+            props.use_numeric_enums(path / "server.properties")
 
     def world_dirs(self, path: Path) -> list[Path]:
         level = props.read(path / "server.properties").get("level-name", "world")
@@ -899,6 +913,8 @@ class Manager:
         """Retourne (serveur, résultat de apply_settings) : l'UI y lit les réglages refusés
         et ceux qui n'ont pas pu s'appliquer à chaud."""
         srv = self.get(sid)
+        if "version" in patch and patch["version"] != srv.meta.get("version"):
+            srv.deps_ready = False  # sinon un reset relancerait l'ancien jar
         allowed = ("name", "version", "ram_mb", "port", "turbo", "seed", "seed_mode")
         for key in allowed:
             if key in patch:

@@ -1156,7 +1156,8 @@ async function openCreate(){
 
   if (!S.versions.length){
     try {
-      const r = await API.get('/api/versions?kind=release&limit=40');
+      // Toutes les versions avec un jar serveur (1.2.5 et après), pas seulement les 40 dernières.
+      const r = await API.get('/api/versions?kind=release&limit=1000');
       S.versions = r.versions;
       const sel = $('fVersion');
       sel.innerHTML = '<option value="">Dernière ('+r.latest+')</option>';

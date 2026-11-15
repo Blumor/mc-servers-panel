@@ -30,13 +30,14 @@ ERROR = "error"
 # et le préfixe « [Not Secure] » des messages non signés.
 _NAME = r"[^\s<>\[\]]{1,16}"
 
+# « ]:? » : avant la 1.7, les logs s'écrivent « [INFO] Steve joined the game », sans deux-points.
 RE_DONE = re.compile(r"Done \(([\d.,]+)s\)!")  # virgule si la JVM formate selon la locale
-RE_JOIN = re.compile(r"]: (%s)(?: \(formerly known as %s\))? joined the game" % (_NAME, _NAME))
-RE_LEAVE = re.compile(r"]: (%s) left the game" % _NAME)
+RE_JOIN = re.compile(r"]:? (%s)(?: \(formerly known as %s\))? joined the game" % (_NAME, _NAME))
+RE_LEAVE = re.compile(r"]:? (%s) left the game" % _NAME)
 RE_PROGRESS = re.compile(r"Preparing spawn area: (\d+)%")
 RE_SEED = re.compile(r"Seed: \[?(-?\d+)\]?")
 RE_DEATH = re.compile(
-    r"]: (%s) (was |died|drowned|blew up|fell|burned|starved|suffocated|"
+    r"]:? (%s) (was |died|drowned|blew up|fell|burned|starved|suffocated|"
     r"withered|hit the ground|went up in flames|tried to swim in lava|discovered the floor)" % _NAME
 )
 
