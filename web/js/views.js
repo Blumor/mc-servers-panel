@@ -25,8 +25,10 @@ function route(){
 }
 
 function renderNav(){
-  document.querySelectorAll('#viewnav a').forEach(a => a.classList.toggle('on', a.dataset.view === S.view));
-  $('brandTitle').textContent = S.view === 'home' ? 'MC Panel' : 'MC Panel · ' + VIEW_TITLE[S.view];
+  // Page d'un serveur : titre et onglet de son panel (Survie, Aventure...).
+  const panel = S.view === 'server' ? ({speedrun: 'speedrun', survival: 'survival', adventure: 'adventure'})[kindOf(cur() || {})] || 'manage' : S.view;
+  document.querySelectorAll('#viewnav a').forEach(a => a.classList.toggle('on', a.dataset.view === panel));
+  $('brandTitle').textContent = panel === 'home' ? 'MC Panel' : 'MC Panel · ' + VIEW_TITLE[panel];
 }
 
 function renderHome(){

@@ -11,6 +11,8 @@ et les mods, puis lance le serveur. Ton pote n'a plus qu'à se connecter.
 
 Toutes les versions de Minecraft Java depuis la 1.2.5 · Windows, Linux, macOS, WSL · interface en français.
 
+![Accueil du panel : choix entre Speedrun, Survie entre potes, Aventure & mini-jeux et Mes serveurs](docs/captures/accueil.jpg)
+
 ---
 
 ## Sommaire
@@ -132,6 +134,8 @@ précédent/suivant du navigateur marchent.
 Pour le speedrun coop : quand l'un de vous meurt, un clic (ou <kbd>R</kbd>) et vous repartez sur un
 monde neuf.
 
+![Cockpit speedrun : serveur en ligne, boutons RESET, START, STOP, mode Turbo, chronomètre et console](docs/captures/speedrun.jpg)
+
 **Créer un serveur** : fenêtre rapide, version, RAM, Turbo, puis *Créer & démarrer*. Dans les
 *Options avancées* : graine, hardcore, comptes crack…
 
@@ -183,6 +187,8 @@ charge.
 Un monde qui dure, avec ou sans plugins et mods. Pas de reset ; sauvegarde automatique toutes les 6 h
 par défaut.
 
+![Page d'un serveur de survie, catégorie Plugins : plugins installés et catalogue Modrinth](docs/captures/survie-plugins.jpg)
+
 **Créer un serveur** ouvre directement sa **page complète**, façon Aternos : en-tête avec état,
 adresse à copier, *Démarrer* / *Arrêter* / *Sauvegarder*, et les catégories à gauche (une page
 chacune). On règle tout, puis *Démarrer*.
@@ -200,6 +206,8 @@ chacune). On règle tout, puis *Démarrer*.
 | 💾 **Sauvegardes** | Liste, créer, restaurer, supprimer, place disque. |
 | 📝 **Fichiers de config** | Éditeur des configs des plugins, des mods et de Paper (`bukkit.yml`, `spigot.yml`, `config/`, `plugins/`…). L'ancienne version est gardée en `.bak`. |
 | 🧪 **Avancé** | Tout `server.properties`, avec le même éditeur typé que le speedrun. |
+
+![Catégorie Logiciel : choix entre Vanilla, Paper, Fabric et NeoForge](docs/captures/survie-logiciel.jpg)
 
 **Ce que fait « Installer »** (plugins, mods, packs) :
 
@@ -223,6 +231,8 @@ Lunar Client ne charge pas de mods : il marche avec Paper et vanilla, pas avec u
 
 Des maps toutes faites (parkour, aventure, puzzle) ou des mini-jeux, à lancer entre potes sans rien
 configurer. La page du panel propose trois façons de commencer :
+
+![Panel Aventure & mini-jeux : serveurs aventure et catalogue de maps parkour](docs/captures/aventure.jpg)
 
 1. **Choisir une map du catalogue** → *Jouer*. Le panel crée le serveur, télécharge la map depuis le
    site de son auteur et l'installe. Au catalogue pour l'instant : les 11 maps parkour de
@@ -249,6 +259,8 @@ configurer. La page du panel propose trois façons de commencer :
 **Page d'un serveur aventure** : la même page à catégories que la survie, avec deux catégories en plus
 (et sans Modpacks) :
 
+![Catégorie Map d'un serveur aventure : map installée, bouton Recommencer la map, changement de map](docs/captures/aventure-map.jpg)
+
 | Catégorie | Contenu |
 |---|---|
 | 🗺️ **Map** | Map installée (auteur, version d'origine, lien vers sa page), **🔁 Recommencer la map** (remet le monde comme au premier lancement, progression effacée), pack de ressources de la map s'il y en a un (à télécharger et donner aux joueurs), changer de map (catalogue ou import). |
@@ -269,6 +281,8 @@ Tous les serveurs, tous types confondus, sur une seule page. Pour chacun : état
 port, place disque (monde + sauvegardes), dernière sauvegarde. Actions directes : démarrer, arrêter,
 sauvegarder, ouvrir les réglages ou sa page. Boutons *＋ Speedrun*, *＋ Survie* et *＋ Aventure*
 pour en créer un.
+
+![Mes serveurs : liste de tous les serveurs avec état, version, place disque et actions](docs/captures/mes-serveurs.jpg)
 
 ---
 
@@ -398,7 +412,8 @@ backups/<id>/            sauvegardes ZIP (dont la copie d'origine des maps)
 ```
 
 **Autres dossiers du dépôt** : `panel.sh` / `PANEL.bat` (lanceurs depuis le code source),
-`packaging/` (construction de l'exe), `.github/workflows/` (publication automatique).
+`packaging/` (construction de l'exe, icône), `.github/workflows/` (publication automatique),
+`docs/captures/` (images de ce README, faites sur des serveurs de démonstration avec des IP fictives).
 
 ---
 
@@ -463,6 +478,6 @@ En local : `python packaging/build_exe.py` (nécessite `pip install pyinstaller`
 | « Aucun monde Minecraft dans cette archive » | Le ZIP ne contient pas de `level.dat` : ce n'est pas une map Java (ou c'est un ZIP de ZIP : décompresse-le d'abord). |
 | Une map ne marche pas bien (blocs de commande inactifs, joueurs expulsés pour vol) | Vérifier dans *Avancé* que `enable-command-block` et `allow-flight` sont activés, et la version de Minecraft demandée par la map dans *Général*. |
 | Ton pote est refusé sur un serveur moddé | Il lui faut les mêmes mods : *Pack pour les joueurs* à importer dans Modrinth App ou Prism. |
-| Le panel ne s'ouvre pas | Port 8765 pris : le panel bascule sur le suivant, l'adresse est affichée dans la fenêtre noire. |
+| Le panel ne s'ouvre pas | Port 8765 pris : le panel bascule sur le suivant, l'adresse est affichée dans le terminal. |
 | « Connexion perdue » après un reset Turbo | Normal, c'est la bascule. *Se reconnecter*. |
 | « Hôte non autorisé » ou « Requête venant d'un autre site refusée » | Ouvrir le panel via `localhost`, une IP ou le nom du PC. Voir [Sécurité](#sécurité). |

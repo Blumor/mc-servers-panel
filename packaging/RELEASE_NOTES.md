@@ -1,5 +1,6 @@
 ## Nouveautés
 
+- **Corrections d'affichage** : titre de la page d'un serveur (« undefined »), liens en forme de bouton affichés en bleu souligné.
 - **Textes plus propres** : « 1 serveur », « 2 serveurs », « 3 joueurs »… au lieu de « serveur(s) ».
 - **Nouvelle icône** pour l'exe (Explorateur, barre des tâches, raccourcis) et pour l'onglet du navigateur.
 - **Nouveau nom : MC Servers Panel** (avant : MC Speedrun Panel). Le panel ne sert plus seulement au speedrun : l'exe s'appelle maintenant `MCServersPanel.exe`.
@@ -10,13 +11,11 @@
   - **Recommencer la map** en un clic (retour à l'état d'origine) ;
   - mini-jeux Modrinth (Manhunt, OneBlock, BedWars…) en datapacks ou en plugins.
 
-**Mise à jour depuis `MCSpeedrunPanel.exe`** : pose `MCServersPanel.exe` dans le même dossier et supprime l'ancien. Le dossier `mcpanel-data` est repris tel quel (serveurs, mondes, sauvegardes).
-
 ## Installation (Windows)
 
 1. Télécharge **MCServersPanel.exe** ci-dessous (rien d'autre à installer : Python est inclus, Java et Minecraft sont téléchargés tout seuls).
 2. Range-le dans un dossier à lui (ex. `Documents\MC Servers Panel`), puis double-clic.
-3. Le navigateur s'ouvre sur le panel. Laisse la fenêtre noire ouverte : la fermer arrête le panel et ses serveurs.
+3. Le navigateur s'ouvre sur le panel. Laisse le terminal ouvert : le fermer arrête le panel et ses serveurs.
 
 Tes mondes et réglages sont dans le dossier `mcpanel-data`, créé à côté de l'exe.
 
